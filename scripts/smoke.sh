@@ -157,8 +157,9 @@ if has_module auth && [[ "${AUTOROUTES_MCP_SECURITY_ENABLED:-true}" != false ]];
     ko "jeton client_credentials de kex-supervisor" "Keycloak n'a pas émis de jeton"
   fi
 fi
-check_catalog "Autoroutes" "$AR_MCP/mcp" "$ar_auth" \
-  rechercher_gares consulter_anomalies declarer_anomalies lever_anomalies
+ar_tools=(rechercher_gares consulter_anomalies declarer_anomalies lever_anomalies)
+has_module actions && ar_tools+=(etat_gare)
+check_catalog "Autoroutes" "$AR_MCP/mcp" "$ar_auth" "${ar_tools[@]}"
 if has_module docs; then
   check_catalog "SpectraLLM" "$SPECTRA/mcp" "X-API-Key: ${SPECTRA_KEX_CALLER_KEY:-}" \
     spectra_search spectra_list_documents spectra_preview_document
@@ -221,6 +222,17 @@ if command -v jq >/dev/null 2>&1; then
         "$(jq -c --arg c "$connection" '.[]? | select(.connection == $c) | {initialized, refreshError}' <<<"$servers" 2>/dev/null)"
     fi
   done
+fi
+
+# L'overlay actions relit l'effet par etat_gare, que l'agent doit donc voir. declarer_anomalies, lui, est
+# masqué à dessein : la règle denied le retire du modèle, seule l'action gouvernée l'appelle.
+if has_module actions && command -v jq >/dev/null 2>&1; then
+  found="$(jq '[.[]? | select(.connection == "mcpautoroute") | .tools[]? | select(.name == "etat_gare")] | length' <<<"$servers" 2>/dev/null)"
+  if [[ "${found:-0}" -gt 0 ]]; then
+    ok "outil etat_gare exposé par mcpautoroute"
+  else
+    ko "outil etat_gare absent de mcpautoroute" "image Autoroutes antérieure à 0.5.3 ?"
+  fi
 fi
 
 # ─── 5. Proxy TLS ────────────────────────────────────────────────────────────────
