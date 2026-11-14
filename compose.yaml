@@ -187,6 +187,15 @@ services:
         {"kex":{"agent":{"tools":{"rules":{
         "declarer_anomalies":{"denied":true},
         "lever_anomalies":{"denied":true}}}}}}
+      # Processus supervisé de la suite. Le hint donne à l'agent les topics et le groupe à interroger :
+      # il ne les déduit pas du nom. Procédures associées : kex/skills, amorcées par scripts/seed-kex.sh.
+      KEX_AGENT_SUPERVISION_PROCESSES_0_ID: pipeline-peage
+      KEX_AGENT_SUPERVISION_PROCESSES_0_NAME: Pipeline péage
+      KEX_AGENT_SUPERVISION_PROCESSES_0_DESCRIPTION: Événements de gare, de leur émission à leur affichage sur la carte d'Autoroutes
+      KEX_AGENT_SUPERVISION_PROCESSES_0_HINT: >-
+        topics [toll-events], consumer group autoroutes-supervision ; DLQ : topic source toll-events,
+        topic de rejets toll-events.rejected ; état publié côté carte par consulter_anomalies (Autoroutes).
+        Les données issues du simulateur sont étiquetées simulées.
     volumes:
       # Connexions MCP chiffrées, mémoire et espace utilisateur.
       - agent_state:/var/lib/kex
