@@ -1,0 +1,32 @@
+# Exécution gouvernée de la déclaration d'anomalie (tâche 3.4).
+#
+# À n'activer qu'avec Kex-anHarness ≥ PR #223 (capacités DECLARE_ANOMALY/CLEAR_ANOMALY) et Autoroutes ≥ PR #58
+# (outil etat_gare) publiés : une version plus ancienne de Kex refuse de démarrer sur une capacité inconnue.
+#   COMPOSE_FILE=compose.yaml:compose.docs.yaml:compose.auth.yaml:compose.actions.yaml
+#
+# Chaîne : le modèle propose {gare, anomalies} → un humain approuve dans la console Kex → declarer_anomalies
+# (arguments fixes : version_attendue absente, la garde de version reste côté Autoroutes) → relecture indépendante
+# par etat_gare : maVersion doit égaler l'eventTime que l'action a rendu.
+#
+# Le JSON REMPLACE celui de compose.yaml (une seule variable SPRING_APPLICATION_JSON par conteneur) : les règles de
+# refus des outils d'écriture appelés directement par le modèle y sont donc répétées.
+services:
+  agent:
+    environment:
+      SPRING_APPLICATION_JSON: >-
+        {"kex":{"agent":{
+        "tools":{"rules":{
+        "declarer_anomalies":{"denied":true},
+        "lever_anomalies":{"denied":true}}},
+        "supervision":{
+        "autonomy":{"DECLARE_ANOMALY":"SUPERVISED","CLEAR_ANOMALY":"SUPERVISED"},
+        "actions":{"DECLARE_ANOMALY":{
+        "connection":"mcpautoroute","tool":"declarer_anomalies",
+        "allowed-arguments":["gare","anomalies"],
+        "verification":{
+        "connection":"mcpautoroute","tool":"etat_gare",
+        "arguments-from-action":{"gare":"/stationId"},
+        "result-pointer":"/maVersion",
+        "expected-from-action-pointer":"/eventTime",
+        "observed-at-pointer":"/lectureA",
+        "max-age":"5m"}}}}}}}
