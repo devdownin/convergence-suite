@@ -11,7 +11,8 @@
 #
 # declarer_anomalies est governed-only (Kex ≥ 0.13.2) : caché au modèle, qui ne peut donc pas l'appeler hors
 # approbation, mais laissé à l'action liée. denied l'aurait bloqué aussi pour elle. lever_anomalies, sans
-# action liée, reste denied.
+# action liée, reste denied. etat_gare est déclaré read-only : Kex n'accepte pour vérificateur qu'un outil que
+# l'administrateur a dit en lecture seule, l'annotation readOnlyHint du serveur ne suffit pas.
 #
 # Le JSON REMPLACE celui de compose.yaml (une seule variable SPRING_APPLICATION_JSON par conteneur) : les règles de
 # refus des outils d'écriture appelés directement par le modèle y sont donc répétées.
@@ -22,6 +23,7 @@ services:
         {"kex":{"agent":{
         "tools":{"rules":{
         "declarer_anomalies":{"governed-only":true},
+        "etat_gare":{"read-only":true},
         "lever_anomalies":{"denied":true}}},
         "supervision":{
         "autonomy":{"DECLARE_ANOMALY":"SUPERVISED","CLEAR_ANOMALY":"SUPERVISED"},
