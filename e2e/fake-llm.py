@@ -9,6 +9,7 @@ recopie.
 
 Hors cycle de supervision (toute autre requête de l'agent), il répond un texte neutre.
 """
+import html
 import json
 import os
 import re
@@ -29,10 +30,11 @@ def log(message):
 
 
 def text_of(message):
+    """Texte d'un message ; Kex encadre un résultat d'outil de <tool_result> et en échappe le contenu (&quot;)."""
     content = message.get("content")
     if isinstance(content, list):
-        return "".join(part.get("text", "") for part in content if isinstance(part, dict))
-    return content or ""
+        return html.unescape("".join(part.get("text", "") for part in content if isinstance(part, dict)))
+    return html.unescape(content or "")
 
 
 def completion(model, content=None, tool_calls=None):
