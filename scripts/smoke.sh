@@ -208,17 +208,19 @@ for connection in "${expected[@]}"; do
   fi
 done
 
-# Déclarée ne veut pas dire jointe : la liste initialise les clients et rend leurs outils. Ceux
-# d'Autoroutes n'y figurent que si l'agent a passé le handshake, avec son propre jeton quand le MCP est
-# sous jeton : c'est la preuve que le renouvellement client_credentials fonctionne.
+# Déclarée ne veut pas dire jointe : la liste initialise les clients et rend leurs outils. Une
+# connexion n'en rend que si l'agent a passé le handshake avec son propre jeton : bearer statique pour
+# KafkaExplorer, clé pour SpectraLLM, client_credentials renouvelé pour Autoroutes sous le module auth.
 if command -v jq >/dev/null 2>&1; then
-  if jq -e 'any(.[]?; .connection == "mcpautoroute" and any(.tools[]?; .name == "consulter_anomalies"))' \
-    <<<"$servers" >/dev/null 2>&1; then
-    ok "l'agent lit le catalogue d'Autoroutes"
-  else
-    ko "l'agent ne lit pas le catalogue d'Autoroutes" \
-      "$(jq -c '.[]? | select(.connection == "mcpautoroute") | {initialized, refreshError, outils: [.tools[]?.name]}' <<<"$servers" 2>/dev/null)"
-  fi
+  for connection in "${expected[@]}"; do
+    count="$(jq --arg c "$connection" '[.[]? | select(.connection == $c) | .tools[]?] | length' <<<"$servers" 2>/dev/null)"
+    if [[ "${count:-0}" -gt 0 ]]; then
+      ok "l'agent joint $connection ($count outils)"
+    else
+      ko "l'agent ne joint pas $connection" \
+        "$(jq -c --arg c "$connection" '.[]? | select(.connection == $c) | {initialized, refreshError}' <<<"$servers" 2>/dev/null)"
+    fi
+  done
 fi
 
 # ─── 5. Proxy TLS ────────────────────────────────────────────────────────────────

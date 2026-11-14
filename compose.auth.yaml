@@ -51,13 +51,25 @@ services:
       resources:
         limits: { memory: 1g }
 
-  # Jeton de l'agent pour le MCP d'Autoroutes : entrée 2 de kex.mcp.bearer-tokens (application.yml de
-  # Kex), complétée par client-credentials. Inerte avec un Kex qui ne connaît pas cette propriété.
+  # Jeton de l'agent pour le MCP d'Autoroutes : entrée 2 de kex.mcp.bearer-tokens, complétée par
+  # client-credentials.
+  #
+  # La liste entière est redéclarée, pas seulement l'entrée 2 : Spring prend une liste d'une seule
+  # source, et une variable indexée remplace donc toute celle d'application.yml. Écrire seulement
+  # KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_* laissait une entrée 2 sans url-prefix, appliquée à
+  # aucune requête, et effaçait au passage les jetons de KafkaExplorer et de SpectraLLM. Les valeurs
+  # reprennent celles d'application.yml par des placeholders Spring ($$ : non interpolés par Compose).
   agent:
     depends_on:
       keycloak:
         condition: service_healthy
     environment:
+      KEX_MCP_BEARER_TOKENS_0_URL_PREFIX: $${KAFKA_EXPLORER_URL:http://localhost:8080}
+      KEX_MCP_BEARER_TOKENS_0_TOKEN: $${EXPLORER_MCP_AUTH_TOKEN:}
+      KEX_MCP_BEARER_TOKENS_1_URL_PREFIX: $${SPECTRALLM_URL:}
+      KEX_MCP_BEARER_TOKENS_1_TOKEN: $${SPECTRA_API_KEY:}
+      KEX_MCP_BEARER_TOKENS_1_HEADER: X-API-Key
+      KEX_MCP_BEARER_TOKENS_2_URL_PREFIX: $${AUTOROUTES_MCP_URL:}
       KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_TOKEN_URI: http://keycloak:8080/realms/supervision/protocol/openid-connect/token
       KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_CLIENT_ID: kex-supervisor
       KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_CLIENT_SECRET: ${KEX_SUPERVISOR_CLIENT_SECRET:?requis avec le module auth}
