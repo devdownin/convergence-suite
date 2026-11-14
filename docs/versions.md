@@ -7,9 +7,9 @@ Relevée le 2026-11-14 dans les dépôts sources. La suite épingle des **versio
 | Application | Image(s) | Tag épinglé | Commit du tag | Variable |
 | --- | --- | --- | --- | --- |
 | KafkaExplorer | `compagnonsdudev/kafkaexplorer` | `2.4.1` (2026-11-13) | tag `v2.4.1` | `EXPLORER_IMAGE_TAG` |
-| Kex-anHarness | `compagnonsdudev/kex-agent-ai` | `0.13.1` (2026-11-14) | tag `v0.13.1` | `KEX_AGENT_IMAGE_TAG` |
+| Kex-anHarness | `compagnonsdudev/kex-agent-ai` | `0.13.2` (2026-11-14) | tag `v0.13.2` | `KEX_AGENT_IMAGE_TAG` |
 | SpectraLLM | `compagnonsdudev/spectrallm`, `compagnonsdudev/spectrallm-frontend` | `0.12.3` (2026-10-19) | tag `v0.12.3` | `SPECTRA_IMAGE_TAG` |
-| Autoroutes | `compagnonsdudev/autoroutes:{backend,simulator,mcp-anomalies,frontend}-<tag>` | `0.5.3` (2026-11-14) | tag `v0.5.3` | `AUTOROUTES_TAG` |
+| Autoroutes | `compagnonsdudev/autoroutes:{backend,simulator,mcp-anomalies,frontend}-<tag>` | `0.5.4` (2026-11-14) | tag `v0.5.4` | `AUTOROUTES_TAG` |
 
 Images d'infrastructure :
 
@@ -43,7 +43,7 @@ Trois serveurs ou clients MCP sur quatre sont déjà sur Spring AI 2.0.2 : l'ali
 | Outils MCP SpectraLLM | 6 outils, dont `spectra_read_document` | La sonde de KafkaExplorer n'en attend que 5 en 0.12.3 | `spectra_read_document` à vérifier avant la phase 4 |
 | Numérotation SpectraLLM | `backend/pom.xml` en `1.1.0-SNAPSHOT`, CHANGELOG à 1.13.0 | Tags Git et images en `0.12.x` | Trois numérotations à réconcilier ; la suite suit les tags d'image |
 | Fonctions Kex de la phase 2 | — | `client-credentials` et `harness_*` présents dès Kex `0.13.0` | MCP d'Autoroutes sous jeton dès que le module `auth` est actif |
-| Fonctions de la phase 3 | Kex : `DECLARE_ANOMALY` (PR #223) ; Autoroutes : `etat_gare` (PR #58), provenance des rejets (PR #59) | Présentes dans Kex `0.13.1` et Autoroutes `0.5.3` (absentes de Kex `0.13.0`, taguée avant #223) | Overlay `compose.actions.yaml` utilisable ; démarré en CI avec le module `auth` |
+| Fonctions de la phase 3 | Kex : `DECLARE_ANOMALY` (PR #223) ; Autoroutes : `etat_gare` (PR #58), provenance des rejets (PR #59) | Présentes dans Kex `0.13.1` et Autoroutes `0.5.3`, mais la boucle n'aboutit qu'avec Kex #225 (`governed-only`, `settle`) et Autoroutes #61 (gare muette, `structuredContent`) | Overlay `compose.actions.yaml` à utiliser avec Kex ≥ `0.13.2` et Autoroutes ≥ `0.5.4` : sous `0.13.1`, `governed-only` est ignoré et `declarer_anomalies` redevient visible du modèle |
 | Tags Kex-anHarness | — | Un tag `v9.12.1` coexiste avec `v0.12.1` | Probable coquille à supprimer dans le dépôt Kex |
 
 ## Mettre à jour une version
