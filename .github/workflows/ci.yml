@@ -68,7 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        modules: ["compose.yaml", "compose.yaml:compose.auth.yaml"]
+        modules: ["compose.yaml", "compose.yaml:compose.auth.yaml", "compose.yaml:compose.auth.yaml:compose.actions.yaml"]
     name: smoke (${{ matrix.modules }})
     steps:
       - uses: actions/checkout@v4

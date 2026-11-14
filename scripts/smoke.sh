@@ -223,6 +223,19 @@ if command -v jq >/dev/null 2>&1; then
   done
 fi
 
+# L'overlay actions s'appuie sur deux outils d'Autoroutes : celui qui écrit et celui qui relit. Une image
+# trop ancienne démarre sans eux, et l'action échouerait seulement au premier usage.
+if has_module actions && command -v jq >/dev/null 2>&1; then
+  for tool in declarer_anomalies etat_gare; do
+    found="$(jq --arg t "$tool" '[.[]? | select(.connection == "mcpautoroute") | .tools[]? | select(.name == $t)] | length' <<<"$servers" 2>/dev/null)"
+    if [[ "${found:-0}" -gt 0 ]]; then
+      ok "outil $tool exposé par mcpautoroute"
+    else
+      ko "outil $tool absent de mcpautoroute" "image Autoroutes antérieure à 0.5.3 ?"
+    fi
+  done
+fi
+
 # ─── 5. Proxy TLS ────────────────────────────────────────────────────────────────
 step "5. Proxy TLS"
 # Certificat de l'autorité locale de Caddy : -k ici, la confiance est l'affaire de l'hôte.

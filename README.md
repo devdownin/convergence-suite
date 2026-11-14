@@ -72,7 +72,7 @@ Les chiffres d'Autoroutes viennent de son simulateur : ce sont des **données si
 - Avec le module `docs`, l'interface web de SpectraLLM répond 401 sur ses appels d'API : elle n'envoie pas la clé que son serveur MCP exige. Utiliser l'API ou l'agent.
 - La règle d'alerte mémoire d'Autoroutes additionne le tas de toutes les JVM collectées (voir `observability/prometheus.yml`).
 - Kex-anHarness n'est pas collecté par Prometheus : son endpoint de métriques exige le bearer de l'API.
-- Le module `auth` exige Kex `0.13.0` ou plus : une image plus ancienne ne renouvelle pas son jeton et reçoit 401 (`AUTOROUTES_MCP_SECURITY_ENABLED=false` pour y revenir).
+- Le module `auth` exige Kex `0.13.0` ou plus (`0.13.1` pour l'overlay `actions`) : une image plus ancienne ne renouvelle pas son jeton et reçoit 401 (`AUTOROUTES_MCP_SECURITY_ENABLED=false` pour y revenir).
 
 ## Contenu du dépôt
 
@@ -101,7 +101,7 @@ docs/verifications-phase-0.md  points vérifiés dans le code des quatre dépôt
 | 0 — Cadrage | ADR, matrice de versions, six points vérifiés | Livrée |
 | 1 — Assemblage | Compose à modules, broker unique, proxy TLS, test de fumée en CI | Livrée, à valider en CI |
 | 2 — Agent unifié et gouvernance | Jetons renouvelés et `harness_*` (code Kex, PR #222), client `kex-supervisor`, caller SpectraLLM, processus et compétences | Livrée ; MCP d'Autoroutes sous jeton avec le module `auth` (Kex `0.13.0`) |
-| 3 — Boucle opérationnelle | Métriques péage, prévisions, DLQ, action vérifiée | Code fusionné : 3.2 (Autoroutes #59), 3.3 (Autoroutes #58), 3.4 (Kex #223) ; overlay `actions` prêt mais inactif tant que ces changements ne sont pas publiés (Kex `0.13.0` les précède) ; 3.1 : `scripts/seed-forecasts.sh` écrit mais non vérifié (débit et rejets seulement ; entrées/sorties par gare à faire avec l'assistant de la console) |
+| 3 — Boucle opérationnelle | Métriques péage, prévisions, DLQ, action vérifiée | Code fusionné : 3.2 (Autoroutes #59), 3.3 (Autoroutes #58), 3.4 (Kex #223) ; publiés dans Kex `0.13.1` et Autoroutes `0.5.3` ; overlay `actions` démarré en CI (l'agent y accepte la liaison, sans déclenchement réel) ; 3.1 : `scripts/seed-forecasts.sh` écrit mais non vérifié (débit et rejets seulement ; entrées/sorties par gare à faire avec l'assistant de la console) |
 | 4 — Connaissance et IA locale | Ingestion des specs et audits, DPO, fine-tuning | À venir |
 | 5 — Industrialisation | MCP communs, monitoring complet, SSO, liens profonds | À venir |
 

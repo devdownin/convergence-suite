@@ -153,7 +153,7 @@ services:
   # ═══ Kex-anHarness — l'agent pivot ═══════════════════════════════════════════
 
   agent:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kex-agent-ai:${KEX_AGENT_IMAGE_TAG:-0.13.0}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kex-agent-ai:${KEX_AGENT_IMAGE_TAG:-0.13.1}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${KEX_AGENT_PORT:-8081}:8081"
     # Les clients MCP de l'agent se connectent paresseusement, à la première requête : attendre
@@ -237,7 +237,7 @@ services:
 
   autoroutes-backend:
     <<: *hardened
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:backend-${AUTOROUTES_TAG:-0.5.1}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:backend-${AUTOROUTES_TAG:-0.5.3}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_API_PORT:-8085}:8080"
     networks:
@@ -267,7 +267,7 @@ services:
   # Données SIMULÉES. Toute vue de la suite qui en dérive doit le dire.
   autoroutes-simulator:
     <<: *hardened
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:simulator-${AUTOROUTES_TAG:-0.5.1}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:simulator-${AUTOROUTES_TAG:-0.5.3}
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SIMULATOR_RATE: ${SIMULATOR_RATE:-80}
@@ -281,7 +281,7 @@ services:
 
   autoroutes-mcp:
     <<: *hardened
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:mcp-anomalies-${AUTOROUTES_TAG:-0.5.1}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:mcp-anomalies-${AUTOROUTES_TAG:-0.5.3}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_MCP_PORT:-8090}:8090"
     environment:
@@ -301,7 +301,7 @@ services:
   autoroutes-ui:
     <<: *hardened
     # Carte et graphe embarqués dans l'image publiée : aucun volume de tuiles à monter.
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:frontend-${AUTOROUTES_TAG:-0.5.1}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:frontend-${AUTOROUTES_TAG:-0.5.3}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_UI_PORT:-8084}:8080"
     tmpfs:
