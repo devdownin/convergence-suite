@@ -119,7 +119,8 @@ jobs:
         run: |
           docker build -q -t compagnonsdudev/kex-agent-ai:e2e https://github.com/devdownin/Kex-anHarness.git#verification-stabilisation
           docker build -q -t compagnonsdudev/autoroutes:simulator-e2e -f simulator/Dockerfile https://github.com/SteelDevAndroid/autoroutes.git#simulateur-gare-muette
-          for s in backend mcp-anomalies frontend; do docker pull -q compagnonsdudev/autoroutes:$s-0.5.3; docker tag compagnonsdudev/autoroutes:$s-0.5.3 compagnonsdudev/autoroutes:$s-e2e; done
+          docker build -q -t compagnonsdudev/autoroutes:mcp-anomalies-e2e -f mcp-anomalies/Dockerfile https://github.com/SteelDevAndroid/autoroutes.git#simulateur-gare-muette
+          for s in backend frontend; do docker pull -q compagnonsdudev/autoroutes:$s-0.5.3; docker tag compagnonsdudev/autoroutes:$s-0.5.3 compagnonsdudev/autoroutes:$s-e2e; done
           sed -i -e '/^KEX_AGENT_IMAGE_TAG=/d' -e '/^AUTOROUTES_TAG=/d' .env
           printf 'KEX_AGENT_IMAGE_TAG=e2e\nAUTOROUTES_TAG=e2e\n' >> .env
 
