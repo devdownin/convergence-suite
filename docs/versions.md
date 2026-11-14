@@ -9,7 +9,7 @@ Relevée le 2026-11-14 dans les dépôts sources. La suite épingle des **versio
 | KafkaExplorer | `compagnonsdudev/kafkaexplorer` | `2.4.1` (2026-11-13) | tag `v2.4.1` | `EXPLORER_IMAGE_TAG` |
 | Kex-anHarness | `compagnonsdudev/kex-agent-ai` | `0.12.1` | tag `v0.12.1` | `KEX_AGENT_IMAGE_TAG` |
 | SpectraLLM | `compagnonsdudev/spectrallm`, `compagnonsdudev/spectrallm-frontend` | `0.12.3` (2026-10-19) | tag `v0.12.3` | `SPECTRA_IMAGE_TAG` |
-| Autoroutes | `compagnonsdudev/autoroutes:{backend,simulator,mcp-anomalies,frontend}-<tag>` | `0.5.2` | tag `v0.5.2` | `AUTOROUTES_TAG` |
+| Autoroutes | `compagnonsdudev/autoroutes:{backend,simulator,mcp-anomalies,frontend}-<tag>` | `0.5.1` (images ; le tag `0.5.2` n'est pas publié sur Docker Hub) | fichiers repris du tag `v0.5.2` | `AUTOROUTES_TAG` |
 
 Images d'infrastructure :
 

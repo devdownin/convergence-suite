@@ -228,7 +228,7 @@ services:
 
   autoroutes-backend:
     <<: *hardened
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:backend-${AUTOROUTES_TAG:-0.5.2}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:backend-${AUTOROUTES_TAG:-0.5.1}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_API_PORT:-8085}:8080"
     networks:
@@ -258,7 +258,7 @@ services:
   # Données SIMULÉES. Toute vue de la suite qui en dérive doit le dire.
   autoroutes-simulator:
     <<: *hardened
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:simulator-${AUTOROUTES_TAG:-0.5.2}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:simulator-${AUTOROUTES_TAG:-0.5.1}
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SIMULATOR_RATE: ${SIMULATOR_RATE:-80}
@@ -272,7 +272,7 @@ services:
 
   autoroutes-mcp:
     <<: *hardened
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:mcp-anomalies-${AUTOROUTES_TAG:-0.5.2}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:mcp-anomalies-${AUTOROUTES_TAG:-0.5.1}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_MCP_PORT:-8090}:8090"
     environment:
@@ -292,7 +292,7 @@ services:
   autoroutes-ui:
     <<: *hardened
     # Carte et graphe embarqués dans l'image publiée : aucun volume de tuiles à monter.
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:frontend-${AUTOROUTES_TAG:-0.5.2}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:frontend-${AUTOROUTES_TAG:-0.5.1}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_UI_PORT:-8084}:8080"
     tmpfs:
