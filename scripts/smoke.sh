@@ -98,6 +98,7 @@ check_catalog() {
   fi
   local tools
   tools="$(mcp_rpc "$url" "$auth" '{"jsonrpc":"2.0","id":2,"method":"tools/list"}')"
+  printf '%s\n' "$tools" >"$work/tools.${name// /_}"
   local missing=()
   for tool in "$@"; do
     grep -q "\"$tool\"" <<<"$tools" || missing+=("$tool")
@@ -136,8 +137,22 @@ check_catalog "KafkaExplorer" "$EXPLORER/mcp" "Authorization: Bearer ${EXPLORER_
 check_catalog "Autoroutes" "$AR_MCP/mcp" "" \
   rechercher_gares consulter_anomalies declarer_anomalies lever_anomalies
 if has_module docs; then
-  check_catalog "SpectraLLM" "$SPECTRA/mcp" "X-API-Key: ${SPECTRA_API_KEY:-}" \
+  check_catalog "SpectraLLM" "$SPECTRA/mcp" "X-API-Key: ${SPECTRA_KEX_CALLER_KEY:-}" \
     spectra_search spectra_list_documents spectra_preview_document
+fi
+
+# Aucun nom d'outil ne doit exister dans deux catalogues : l'agent les voit tous ensemble.
+if command -v jq >/dev/null 2>&1; then
+  duplicates="$(for f in "$work"/tools.*; do
+    grep -E '^(data: )?\{' "$f" | sed 's/^data: //' | jq -r '.result.tools[]?.name' 2>/dev/null
+  done | sort | uniq -d)"
+  if [[ -z "$duplicates" ]]; then
+    ok "aucun nom d'outil en double entre les catalogues"
+  else
+    ko "noms d'outils en double" "$duplicates"
+  fi
+else
+  printf '  (jq absent : unicité des noms non vérifiée)\n'
 fi
 
 # ─── 3. Broker unique ────────────────────────────────────────────────────────────

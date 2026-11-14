@@ -3,10 +3,16 @@
 #
 #   COMPOSE_FILE=compose.yaml:compose.auth.yaml   (dans .env)
 #
-# En phase 1, Keycloak est démarré mais n'est imposé à aucune application. Pour rendre la carte
-# d'Autoroutes authentifiée : AUTOROUTES_SUPERVISION_PROFILE=auth dans .env. Effet de bord connu :
-# le MCP d'Autoroutes relaie au backend le jeton de l'appelant ; l'agent n'en présente pas encore,
-# donc consulter_anomalies répond une erreur d'autorisation jusqu'à la phase 2.
+# Keycloak n'est imposé à aucune application par défaut. Deux interrupteurs dans .env :
+#   AUTOROUTES_SUPERVISION_PROFILE=auth        la carte d'Autoroutes demande une connexion ;
+#   AUTOROUTES_MCP_SECURITY_ENABLED=true       le MCP d'Autoroutes exige un jeton ANOMALY_REPORTER.
+# L'agent Kex obtient alors son jeton seul (client « kex-supervisor », flux client_credentials,
+# renouvelé avant les 5 minutes d'expiration). Cela demande un Kex qui sait renouveler : une image
+# postérieure à 0.12.1 (docs/versions.md). Avec 0.12.1, laisser AUTOROUTES_MCP_SECURITY_ENABLED
+# vide, sans quoi l'agent reçoit 401.
+#
+# Le royaume importé est auth/realm-supervision.json, généré par scripts/build-realm.py à partir de
+# celui d'Autoroutes : il ajoute le client « kex-supervisor ».
 #
 # Mode développement (start-dev, base H2 éphémère, royaume réimporté à chaque démarrage, HTTP) :
 # suffisant pour valider la chaîne OIDC, pas pour la production.
@@ -30,8 +36,9 @@ services:
       KEYCLOAK_VIEWER_PASSWORD: ${KEYCLOAK_VIEWER_PASSWORD:?requis avec le module auth}
       KEYCLOAK_ADMIN_USER_PASSWORD: ${KEYCLOAK_ADMIN_USER_PASSWORD:?requis avec le module auth}
       MCP_AGENT_CLIENT_SECRET: ${MCP_AGENT_CLIENT_SECRET:?requis avec le module auth}
+      KEX_SUPERVISOR_CLIENT_SECRET: ${KEX_SUPERVISOR_CLIENT_SECRET:?requis avec le module auth}
     volumes:
-      - ./upstream/autoroutes/auth/realm-supervision.json:/opt/keycloak/data/import/realm-supervision.json:ro
+      - ./auth/realm-supervision.json:/opt/keycloak/data/import/realm-supervision.json:ro
     healthcheck:
       # Pas de curl dans l'image : sonde /dev/tcp sur le port de gestion (9000).
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
@@ -43,6 +50,17 @@ services:
     deploy:
       resources:
         limits: { memory: 1g }
+
+  # Jeton de l'agent pour le MCP d'Autoroutes : entrée 2 de kex.mcp.bearer-tokens (application.yml de
+  # Kex), complétée par client-credentials. Inerte avec un Kex qui ne connaît pas cette propriété.
+  agent:
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_TOKEN_URI: http://keycloak:8080/realms/supervision/protocol/openid-connect/token
+      KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_CLIENT_ID: kex-supervisor
+      KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_CLIENT_SECRET: ${KEX_SUPERVISOR_CLIENT_SECRET:?requis avec le module auth}
 
   # Paramètres OIDC du backend Autoroutes : inertes tant que AUTOROUTES_SUPERVISION_PROFILE est vide.
   autoroutes-backend:

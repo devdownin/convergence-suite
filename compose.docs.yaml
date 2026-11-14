@@ -26,7 +26,9 @@ services:
         condition: service_started
     environment:
       SPECTRALLM_URL: http://spectra-api:8080
-      SPECTRA_API_KEY: ${SPECTRA_API_KEY:?requis avec le module docs}
+      # Clé du caller « kex-agent », pas celle de l'instance : l'agent ne lit que les trois
+      # collections de la suite (SPECTRA_MCP_CALLERS_JSON, plus bas).
+      SPECTRA_API_KEY: ${SPECTRA_KEX_CALLER_KEY:?requis avec le module docs}
       SPRING_AI_MCP_CLIENT_STREAMABLEHTTP_CONNECTIONS_SPECTRALLM_URL: http://spectra-api:8080
       SPRING_AI_MCP_CLIENT_STREAMABLEHTTP_CONNECTIONS_SPECTRALLM_ENDPOINT: /mcp
 
@@ -98,6 +100,11 @@ services:
       SPECTRA_LLM_EMBEDDING_FILE: ${LLM_EMBED_MODEL_FILE:-embed.gguf}
       # Serveur MCP en lecture seule ; sans clé, /mcp répond 503.
       SPECTRA_MCP_ENABLED: "true"
+      # Un caller par client MCP : l'agent Kex ne voit que ces trois collections (recherche,
+      # lecture, aperçu). Les collections sont créées à l'ingestion (phase 4), pas ici.
+      SPECTRA_MCP_CALLERS_JSON: >-
+        {"kex-agent":{"key":"${SPECTRA_KEX_CALLER_KEY:?requis avec le module docs}",
+        "collections":["suite_specs","ops_runbooks","ops_incidents"]}}
       SPECTRA_API_KEY: ${SPECTRA_API_KEY:?requis avec le module docs}
       SPECTRA_PIPELINE_GENERATION_TIMEOUT_SECONDS: ${SPECTRA_GENERATION_TIMEOUT:-300}
       SPECTRA_STARTUP_AUTO_INSTALL_MODELS: ${SPECTRA_AUTO_INSTALL_MODELS:-true}
