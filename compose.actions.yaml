@@ -9,6 +9,10 @@
 # par etat_gare : maVersion doit égaler l'eventTime que l'action a rendu. Le backend d'Autoroutes applique la
 # déclaration en différé : settle relit pendant 15 s avant de conclure (Kex ≥ 0.13.2 ; ignoré avant).
 #
+# declarer_anomalies est governed-only (Kex ≥ 0.13.2) : caché au modèle, qui ne peut donc pas l'appeler hors
+# approbation, mais laissé à l'action liée. denied l'aurait bloqué aussi pour elle. lever_anomalies, sans
+# action liée, reste denied.
+#
 # Le JSON REMPLACE celui de compose.yaml (une seule variable SPRING_APPLICATION_JSON par conteneur) : les règles de
 # refus des outils d'écriture appelés directement par le modèle y sont donc répétées.
 services:
@@ -17,7 +21,7 @@ services:
       SPRING_APPLICATION_JSON: >-
         {"kex":{"agent":{
         "tools":{"rules":{
-        "declarer_anomalies":{"denied":true},
+        "declarer_anomalies":{"governed-only":true},
         "lever_anomalies":{"denied":true}}},
         "supervision":{
         "autonomy":{"DECLARE_ANOMALY":"SUPERVISED","CLEAR_ANOMALY":"SUPERVISED"},

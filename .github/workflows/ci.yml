@@ -115,14 +115,19 @@ jobs:
           scripts/init-env.sh
           sed -i "s|^COMPOSE_FILE=.*|COMPOSE_FILE=compose.yaml:compose.auth.yaml:compose.actions.yaml:compose.e2e.yaml|" .env
 
+      - name: TEMPORAIRE — images construites depuis les PR Kex #225 et Autoroutes #61
+        run: |
+          docker build -q -t compagnonsdudev/kex-agent-ai:e2e https://github.com/devdownin/Kex-anHarness.git#verification-stabilisation
+          docker build -q -t compagnonsdudev/autoroutes:simulator-e2e -f simulator/Dockerfile https://github.com/SteelDevAndroid/autoroutes.git#simulateur-gare-muette
+          for s in backend mcp-anomalies frontend; do docker pull -q compagnonsdudev/autoroutes:$s-0.5.3; docker tag compagnonsdudev/autoroutes:$s-0.5.3 compagnonsdudev/autoroutes:$s-e2e; done
+          sed -i -e '/^KEX_AGENT_IMAGE_TAG=/d' -e '/^AUTOROUTES_TAG=/d' .env
+          printf 'KEX_AGENT_IMAGE_TAG=e2e\nAUTOROUTES_TAG=e2e\n' >> .env
+
       - name: Récupération des images
-        run: docker compose pull --quiet
+        run: docker compose pull --quiet --ignore-pull-failures
 
       - name: Démarrage
         run: docker compose up -d
-
-      - name: TEMPORAIRE — gare muette par arrêt du simulateur (images sans SIMULATOR_SILENT_*)
-        run: sleep 150 && docker compose stop autoroutes-simulator &
 
       - name: Boucle de bout en bout
         run: scripts/e2e.sh
