@@ -3,13 +3,13 @@
 #
 #   COMPOSE_FILE=compose.yaml:compose.auth.yaml   (dans .env)
 #
-# Keycloak n'est imposé à aucune application par défaut. Deux interrupteurs dans .env :
-#   AUTOROUTES_SUPERVISION_PROFILE=auth        la carte d'Autoroutes demande une connexion ;
-#   AUTOROUTES_MCP_SECURITY_ENABLED=true       le MCP d'Autoroutes exige un jeton ANOMALY_REPORTER.
-# L'agent Kex obtient alors son jeton seul (client « kex-supervisor », flux client_credentials,
-# renouvelé avant les 5 minutes d'expiration). Cela demande un Kex qui sait renouveler : une image
-# postérieure à 0.12.1 (docs/versions.md). Avec 0.12.1, laisser AUTOROUTES_MCP_SECURITY_ENABLED
-# vide, sans quoi l'agent reçoit 401.
+# Avec ce module, le MCP d'Autoroutes exige un jeton portant le rôle ANOMALY_REPORTER. L'agent Kex
+# l'obtient seul (client « kex-supervisor », flux client_credentials, renouvelé avant les 5 minutes
+# d'expiration), ce que Kex sait faire depuis 0.13.0. AUTOROUTES_MCP_SECURITY_ENABLED=false le
+# désactive, pour revenir à une image plus ancienne.
+#
+# La carte d'Autoroutes, elle, reste ouverte tant que AUTOROUTES_SUPERVISION_PROFILE n'est pas
+# « auth » : imposer une connexion à des écrans n'est pas la même décision que sécuriser un agent.
 #
 # Le royaume importé est auth/realm-supervision.json, généré par scripts/build-realm.py à partir de
 # celui d'Autoroutes : il ajoute le client « kex-supervisor ».
@@ -51,16 +51,35 @@ services:
       resources:
         limits: { memory: 1g }
 
-  # Jeton de l'agent pour le MCP d'Autoroutes : entrée 2 de kex.mcp.bearer-tokens (application.yml de
-  # Kex), complétée par client-credentials. Inerte avec un Kex qui ne connaît pas cette propriété.
+  # Jeton de l'agent pour le MCP d'Autoroutes : entrée 2 de kex.mcp.bearer-tokens, complétée par
+  # client-credentials.
+  #
+  # La liste entière est redéclarée, pas seulement l'entrée 2 : Spring prend une liste d'une seule
+  # source, et une variable indexée remplace donc toute celle d'application.yml. Écrire seulement
+  # KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_* laissait une entrée 2 sans url-prefix, appliquée à
+  # aucune requête, et effaçait au passage les jetons de KafkaExplorer et de SpectraLLM. Les valeurs
+  # reprennent celles d'application.yml par des placeholders Spring ($$ : non interpolés par Compose).
   agent:
     depends_on:
       keycloak:
         condition: service_healthy
     environment:
+      KEX_MCP_BEARER_TOKENS_0_URL_PREFIX: $${KAFKA_EXPLORER_URL:http://localhost:8080}
+      KEX_MCP_BEARER_TOKENS_0_TOKEN: $${EXPLORER_MCP_AUTH_TOKEN:}
+      KEX_MCP_BEARER_TOKENS_1_URL_PREFIX: $${SPECTRALLM_URL:}
+      KEX_MCP_BEARER_TOKENS_1_TOKEN: $${SPECTRA_API_KEY:}
+      KEX_MCP_BEARER_TOKENS_1_HEADER: X-API-Key
+      KEX_MCP_BEARER_TOKENS_2_URL_PREFIX: $${AUTOROUTES_MCP_URL:}
       KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_TOKEN_URI: http://keycloak:8080/realms/supervision/protocol/openid-connect/token
       KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_CLIENT_ID: kex-supervisor
       KEX_MCP_BEARER_TOKENS_2_CLIENT_CREDENTIALS_CLIENT_SECRET: ${KEX_SUPERVISOR_CLIENT_SECRET:?requis avec le module auth}
+
+  autoroutes-mcp:
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      MCP_SECURITY_ENABLED: ${AUTOROUTES_MCP_SECURITY_ENABLED:-true}
 
   # Paramètres OIDC du backend Autoroutes : inertes tant que AUTOROUTES_SUPERVISION_PROFILE est vide.
   autoroutes-backend:

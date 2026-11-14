@@ -37,7 +37,8 @@ jobs:
             compose.yaml:compose.docs.yaml \
             compose.yaml:compose.monitoring.yaml \
             compose.yaml:compose.auth.yaml \
-            compose.yaml:compose.docs.yaml:compose.monitoring.yaml:compose.auth.yaml
+            compose.yaml:compose.docs.yaml:compose.monitoring.yaml:compose.auth.yaml \
+            compose.yaml:compose.docs.yaml:compose.auth.yaml:compose.actions.yaml
           do
             echo "→ $files"
             COMPOSE_FILE="$files" docker compose config --quiet
@@ -57,22 +58,31 @@ jobs:
             -v "$PWD/upstream/autoroutes/observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro" \
             prom/prometheus:v3.15.1 check config /etc/prometheus/prometheus.yml
 
-  # Démarre le cœur de la suite et lance le test de fumée (tâche 1.4).
+  # Démarre la suite et lance le test de fumée (tâche 1.4), sans puis avec Keycloak : le module auth
+  # met le MCP d'Autoroutes sous jeton, et le smoke vérifie alors que l'agent passe avec le sien.
   # Le module docs n'est pas démarré ici : 4,8 Go de modèles et 16 Go de RAM.
   smoke:
     needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        modules: ["compose.yaml", "compose.yaml:compose.auth.yaml"]
+    name: smoke (${{ matrix.modules }})
     steps:
       - uses: actions/checkout@v4
 
-      - name: Secrets de test
-        run: scripts/init-env.sh
+      # smoke.sh relit .env : les modules s'y écrivent, une variable d'environnement du job serait écrasée.
+      - name: Secrets de test et modules
+        run: |
+          scripts/init-env.sh
+          sed -i "s|^COMPOSE_FILE=.*|COMPOSE_FILE=${{ matrix.modules }}|" .env
 
       - name: Récupération des images
         run: docker compose pull --quiet
 
-      - name: Démarrage du cœur
+      - name: Démarrage
         run: docker compose up -d
 
       - name: Test de fumée

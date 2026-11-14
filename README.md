@@ -48,6 +48,7 @@ Le cœur (`compose.yaml`) démarre Kafka, KafkaExplorer, Kex-anHarness, Autorout
 | `docs` | `compose.docs.yaml` | SpectraLLM, branché sur l'agent (MCP) et sur KafkaExplorer (LLM local) | ~16 Go de RAM, 4,8 Go de modèles au premier démarrage |
 | `monitoring` | `compose.monitoring.yaml` | Prometheus, Alertmanager, Grafana d'Autoroutes, étendus à KafkaExplorer et SpectraLLM | ~1 Go |
 | `auth` | `compose.auth.yaml` | Keycloak, royaume `supervision` d'Autoroutes | ~1 Go |
+| `actions` | `compose.actions.yaml` | Déclaration d'anomalie gouvernée : proposition du modèle, validation humaine, relecture par `etat_gare`. Exige `auth` et des versions publiées de Kex et d'Autoroutes qui portent les PR #223 et #58 | négligeable |
 
 ```bash
 # exemple : tout
@@ -60,7 +61,7 @@ Le module `forecast` (TimesFM) arrivera en phase 3 : son service n'a pas d'image
 
 ## Sécurité — à lire avant tout partage
 
-En phase 1, les serveurs MCP communiquent en clair sur le réseau Compose et le MCP d'Autoroutes n'exige aucun jeton. Tous les ports sont liés à `127.0.0.1`. **Ne pas exposer cette pile sur un réseau partagé tant que `AUTOROUTES_MCP_SECURITY_ENABLED` n'est pas activé** (possible dès qu'une image Kex qui renouvelle les jetons est publiée) ([ADR 0004](docs/adr/0004-fournisseur-identite.md)).
+Les serveurs MCP communiquent en clair sur le réseau Compose et tous les ports sont liés à `127.0.0.1`. Sans le module `auth`, le MCP d'Autoroutes n'exige aucun jeton ; avec lui, il exige un jeton Keycloak portant `ANOMALY_REPORTER`, que l'agent obtient et renouvelle seul. **Ne pas exposer cette pile sur un réseau partagé sans le module `auth`** ([ADR 0004](docs/adr/0004-fournisseur-identite.md)).
 
 L'agent ne peut pas écrire sur la carte : `declarer_anomalies` et `lever_anomalies` lui sont refusés par règle, jusqu'à l'exécution après approbation humaine (tâche 3.4, phase 3).
 
@@ -71,8 +72,7 @@ Les chiffres d'Autoroutes viennent de son simulateur : ce sont des **données si
 - Avec le module `docs`, l'interface web de SpectraLLM répond 401 sur ses appels d'API : elle n'envoie pas la clé que son serveur MCP exige. Utiliser l'API ou l'agent.
 - La règle d'alerte mémoire d'Autoroutes additionne le tas de toutes les JVM collectées (voir `observability/prometheus.yml`).
 - Kex-anHarness n'est pas collecté par Prometheus : son endpoint de métriques exige le bearer de l'API.
-- Le jeton Keycloak de l'agent exige un Kex postérieur à `0.12.1` (PR devdownin/kex-anharness#222). Tant qu'il n'est pas publié, laisser `AUTOROUTES_MCP_SECURITY_ENABLED` vide.
-- Les noms `harness_*` du serveur MCP de Kex arrivent avec cette même version ; en `0.12.1`, ils s'appellent encore `kex_*`.
+- Le module `auth` exige Kex `0.13.0` ou plus : une image plus ancienne ne renouvelle pas son jeton et reçoit 401 (`AUTOROUTES_MCP_SECURITY_ENABLED=false` pour y revenir).
 
 ## Contenu du dépôt
 
@@ -100,8 +100,8 @@ docs/verifications-phase-0.md  points vérifiés dans le code des quatre dépôt
 | --- | --- | --- |
 | 0 — Cadrage | ADR, matrice de versions, six points vérifiés | Livrée |
 | 1 — Assemblage | Compose à modules, broker unique, proxy TLS, test de fumée en CI | Livrée, à valider en CI |
-| 2 — Agent unifié et gouvernance | Jetons renouvelés et `harness_*` (code Kex, PR #222), client `kex-supervisor`, caller SpectraLLM, processus et compétences | Livrée côté suite ; activation du MCP sécurisé en attente de la version Kex |
-| 3 — Boucle opérationnelle | Métriques péage, prévisions, DLQ, action vérifiée | À venir |
+| 2 — Agent unifié et gouvernance | Jetons renouvelés et `harness_*` (code Kex, PR #222), client `kex-supervisor`, caller SpectraLLM, processus et compétences | Livrée ; MCP d'Autoroutes sous jeton avec le module `auth` (Kex `0.13.0`) |
+| 3 — Boucle opérationnelle | Métriques péage, prévisions, DLQ, action vérifiée | Code fusionné : 3.2 (Autoroutes #59), 3.3 (Autoroutes #58), 3.4 (Kex #223) ; overlay `actions` prêt mais inactif tant que ces changements ne sont pas publiés (Kex `0.13.0` les précède) ; 3.1 : `scripts/seed-forecasts.sh` écrit mais non vérifié (débit et rejets seulement ; entrées/sorties par gare à faire avec l'assistant de la console) |
 | 4 — Connaissance et IA locale | Ingestion des specs et audits, DPO, fine-tuning | À venir |
 | 5 — Industrialisation | MCP communs, monitoring complet, SSO, liens profonds | À venir |
 
