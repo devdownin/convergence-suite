@@ -102,7 +102,7 @@ docs/verifications-phase-0.md  points vérifiés dans le code des quatre dépôt
 | 0 — Cadrage | ADR, matrice de versions, six points vérifiés | Livrée |
 | 1 — Assemblage | Compose à modules, broker unique, proxy TLS, test de fumée en CI | Livrée, à valider en CI |
 | 2 — Agent unifié et gouvernance | Jetons renouvelés et `harness_*` (code Kex, PR #222), client `kex-supervisor`, caller SpectraLLM, processus et compétences | Livrée côté suite ; activation du MCP sécurisé en attente de la version Kex |
-| 3 — Boucle opérationnelle | Métriques péage, prévisions, DLQ, action vérifiée | Code livré en PR pour 3.2 (Autoroutes #59), 3.3 (Autoroutes #58), 3.4 (Kex #223) ; overlay `actions` prêt mais inactif tant que ces versions ne sont pas publiées ; 3.1 (prévisions) non démarrée : elle demande la pile complète avec Docker |
+| 3 — Boucle opérationnelle | Métriques péage, prévisions, DLQ, action vérifiée | Code livré en PR pour 3.2 (Autoroutes #59), 3.3 (Autoroutes #58), 3.4 (Kex #223) ; overlay `actions` prêt mais inactif tant que ces versions ne sont pas publiées ; 3.1 : `scripts/seed-forecasts.sh` écrit mais non vérifié (métriques de débit et de rejets seulement ; entrées/sorties par gare à faire avec l'assistant de la console) |
 | 4 — Connaissance et IA locale | Ingestion des specs et audits, DPO, fine-tuning | À venir |
 | 5 — Industrialisation | MCP communs, monitoring complet, SSO, liens profonds | À venir |
 
