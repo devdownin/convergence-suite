@@ -66,6 +66,8 @@ def cycle_answer(tool_name, results):
     if status != "STALE":
         state = "OK" if status == "ACTIVE" else "UNKNOWN"
         log(f"cycle : {STATION} {status or 'illisible'} → {state}, aucune anomalie")
+        if status is None:
+            log("résultat d'outil non reconnu : " + " | ".join(r[:600] for r in results))
         return {"processes": [{"processId": PROCESS, "state": state, "coverage": coverage,
                                "note": f"etat_gare {STATION} : {status or 'illisible'}"}],
                 "anomalies": []}
