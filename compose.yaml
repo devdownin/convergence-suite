@@ -1,4 +1,4 @@
-# Suite Convergence — module « core » : un broker Kafka, KafkaExplorer, Kex-anHarness, Autoroutes
+9# Suite Convergence — module « core » : un broker Kafka, KafkaExplorer, Kex-anHarness, Autoroutes
 # et le reverse proxy TLS. Images publiées uniquement, rien n'est construit.
 #
 #   cp .env.example .env        # puis renseigner les trois secrets marqués « requis »
@@ -153,7 +153,7 @@ services:
   # ═══ Kex-anHarness — l'agent pivot ═══════════════════════════════════════════
 
   agent:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kex-agent-ai:${KEX_AGENT_IMAGE_TAG:-0.12.1}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kex-agent-ai:${KEX_AGENT_IMAGE_TAG:-0.13.0}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${KEX_AGENT_PORT:-8081}:8081"
     # Les clients MCP de l'agent se connectent paresseusement, à la première requête : attendre
