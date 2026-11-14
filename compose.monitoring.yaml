@@ -1,0 +1,91 @@
+# Module « monitoring » — Prometheus, Alertmanager et Grafana d'Autoroutes, étendus à la suite.
+# Surcouche de compose.yaml :
+#
+#   COMPOSE_FILE=compose.yaml:compose.monitoring.yaml   (dans .env)
+#
+# Règles d'alerte, configuration Alertmanager et tableau de bord sont ceux d'Autoroutes (v0.5.2),
+# repris tels quels dans upstream/autoroutes. Seule la configuration de collecte est propre à la
+# suite : observability/prometheus.yml ajoute KafkaExplorer et SpectraLLM aux cibles.
+services:
+
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_IMAGE_TAG:-v3.15.1}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./upstream/autoroutes/observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { memory: 512m }
+
+  alertmanager:
+    image: prom/alertmanager:${ALERTMANAGER_IMAGE_TAG:-v0.34.2}
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./upstream/autoroutes/observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { memory: 128m }
+
+  # Grafana est sous licence AGPL-3.0 (voir docs/docker.md d'Autoroutes).
+  grafana:
+    image: grafana/grafana:${GRAFANA_IMAGE_TAG:-13.3.0}
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?requis avec le module monitoring}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/supervision.json
+      GF_SERVER_ROOT_URL: https://grafana.localhost:${PROXY_HTTPS_PORT:-8443}/
+    volumes:
+      - ./upstream/autoroutes/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./upstream/autoroutes/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { memory: 512m }
+
+  proxy:
+    volumes:
+      - ./proxy/sites/monitoring.caddy:/etc/caddy/sites/monitoring.caddy:ro
+
+volumes:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:

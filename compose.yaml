@@ -1,0 +1,339 @@
+# Suite Convergence — module « core » : un broker Kafka, KafkaExplorer, Kex-anHarness, Autoroutes
+# et le reverse proxy TLS. Images publiées uniquement, rien n'est construit.
+#
+#   cp .env.example .env        # puis renseigner les trois secrets marqués « requis »
+#   docker compose pull
+#   docker compose up -d
+#   scripts/smoke.sh
+#
+# Modules optionnels : surcouches compose.<module>.yaml, choisies par COMPOSE_FILE dans .env
+# (voir README). Une surcouche plutôt qu'un profil, parce qu'un module doit aussi modifier des
+# services du cœur : le module docs branche l'agent et KafkaExplorer sur SpectraLLM, ce qu'un
+# profil Compose ne sait pas faire.
+#
+# Ports (ADR 0001) — boucle locale par défaut, BIND_ADDR pour exposer délibérément :
+#   KafkaExplorer ....... http://localhost:8080   (UI, API, /mcp)
+#   Kex-anHarness ....... http://localhost:8081   (Control Center, /app, /api/agent)
+#   Autoroutes .......... http://localhost:8084   (carte) ; API http://localhost:8085 ; MCP :8090
+#   Proxy TLS ........... https://{explorer,agent,carte}.localhost:8443
+#   Kafka (hôte) ........ localhost:9092
+#
+# SÉCURITÉ EN PHASE 1 (ADR 0004). Les MCP communiquent en clair sur le réseau Compose, et le MCP
+# d'Autoroutes n'exige aucun jeton. Tout repose sur la liaison à 127.0.0.1 : ne pas exposer cette
+# pile sur un réseau partagé avant la phase 2.
+name: convergence
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+# Posture des conteneurs Autoroutes, reprise de son compose.yaml : système de fichiers en lecture
+# seule, écritures dans /tmp, aucune élévation de privilèges.
+x-hardened: &hardened
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  logging: *logging
+  restart: unless-stopped
+
+services:
+
+  # ═══ Kafka — un seul broker pour la suite (ADR 0003) ═════════════════════════
+
+  # L'image apache/kafka tourne en `appuser`, mais Docker crée le volume nommé en root.
+  kafka-data-init:
+    image: apache/kafka:${KAFKA_IMAGE_TAG:-4.4.0}
+    user: root
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    entrypoint: ["sh", "-c", "chown -R appuser:appuser /var/lib/kafka/data"]
+    logging: *logging
+
+  kafka:
+    image: apache/kafka:${KAFKA_IMAGE_TAG:-4.4.0}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${KAFKA_HOST_PORT:-9092}:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # INTERNAL : tous les services de la suite (kafka:9092). HOST : outils lancés depuis l'hôte.
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,HOST://:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,HOST://localhost:${KAFKA_HOST_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      # KafkaExplorer crée ses topics internal.* lui-même ; Spring Kafka crée des .DLT en cas d'échec.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: ${KAFKA_LOG_RETENTION_HOURS:-72}
+      # Identifiant KRaft fixe : le stockage formaté est réutilisé d'un redémarrage à l'autre.
+      CLUSTER_ID: "Q29udmVyZ2VuY2VTdWl0ZQ"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    depends_on:
+      kafka-data-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+      start_interval: 3s
+    # Un nœud KRaft qui s'arrête vide ses journaux ; 10 s par défaut le tueraient en plein flush.
+    stop_grace_period: 30s
+    restart: unless-stopped
+    logging: *logging
+    deploy:
+      resources:
+        limits: { memory: 1536m }
+
+  # Topics du flux métier, comme les crée Autoroutes (kafka-init de son compose.yaml).
+  kafka-init:
+    image: apache/kafka:${KAFKA_IMAGE_TAG:-4.4.0}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic toll-events --partitions 6 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic toll-events.rejected --partitions 3 --replication-factor 1 --config retention.ms=604800000
+    restart: "no"
+    logging: *logging
+
+  # ═══ KafkaExplorer ═══════════════════════════════════════════════════════════
+
+  explorer:
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer:${EXPLORER_IMAGE_TAG:-2.4.1}
+    ports:
+      # Boucle locale : KafkaExplorer n'authentifie personne, et POST /api/config peut repointer
+      # le cluster à chaud.
+      - "${BIND_ADDR:-127.0.0.1}:${EXPLORER_PORT:-8080}:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Broker 4.x : protocole de rééquilibrage KIP-848.
+      KAFKA_CONSUMER_GROUP_PROTOCOL: consumer
+      # Serveur MCP : livré éteint, allumé ici, en lecture seule.
+      EXPLORER_MCP_ENABLED: "true"
+      EXPLORER_MCP_AUTH_TOKEN: ${EXPLORER_MCP_AUTH_TOKEN:?requis, générer avec openssl rand -hex 32}
+      EXPLORER_MCP_READONLY: "true"
+      # Clair sur le réseau Compose uniquement : l'agent appelle explorer:8080 en direct.
+      # Le proxy chiffre le trafic venant de l'hôte. Voir ADR 0004 et docs/verifications-phase-0.md.
+      EXPLORER_MCP_REQUIRE_TLS: "false"
+      # Les flux métier de la suite et les topics internes que KafkaExplorer gère lui-même.
+      EXPLORER_MCP_ALLOWED_TOPIC_PREFIXES: ${EXPLORER_MCP_ALLOWED_TOPIC_PREFIXES:-*}
+      EXPLORER_MCP_ALLOWED_GROUP_PREFIXES: ${EXPLORER_MCP_ALLOWED_GROUP_PREFIXES:-*}
+      EXPLORER_MCP_DLP_MODE: ${EXPLORER_MCP_DLP_MODE:-redact}
+      EXPLORER_MCP_AUDIT_TOPIC: internal.mcp.audit
+    volumes:
+      - explorer_logs:/app/logs
+      - explorer_data:/app/data
+    # 15 s d'arrêt web + 10 s de destruction des beans, plus la sortie de la JVM.
+    stop_grace_period: 35s
+    restart: unless-stopped
+    logging: *logging
+
+  # ═══ Kex-anHarness — l'agent pivot ═══════════════════════════════════════════
+
+  agent:
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kex-agent-ai:${KEX_AGENT_IMAGE_TAG:-0.12.1}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${KEX_AGENT_PORT:-8081}:8081"
+    # Les clients MCP de l'agent se connectent paresseusement, à la première requête : attendre
+    # les sondes des serveurs ne ferait que retarder le Control Center.
+    depends_on:
+      explorer:
+        condition: service_started
+      autoroutes-mcp:
+        condition: service_started
+    environment:
+      # Modèle hébergé : Anthropic par défaut, OpenRouter avec KEX_AGENT_LLM_PROVIDER=openai.
+      # Sans clé, l'agent démarre dégradé et le dit ; Control Center et catalogue MCP répondent.
+      KEX_AGENT_LLM_PROVIDER: ${KEX_AGENT_LLM_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      # Bearer exigé sur /api/** : sans lui, l'agent répond 503.
+      KEX_AGENT_API_KEY: ${KEX_AGENT_API_KEY:?requis, générer avec openssl rand -hex 32}
+      # Connexion MCP 1 — KafkaExplorer (déclarée par application.yml sous le nom kafka-explorer).
+      KAFKA_EXPLORER_URL: http://explorer:8080
+      EXPLORER_MCP_AUTH_TOKEN: ${EXPLORER_MCP_AUTH_TOKEN:?requis, générer avec openssl rand -hex 32}
+      # Connexion MCP 2 — Autoroutes, comme compose/autoroutes.yml de Kex-anHarness.
+      AUTOROUTES_MCP_URL: http://autoroutes-mcp:8090
+      AUTOROUTES_MCP_TOKEN: ${AUTOROUTES_MCP_TOKEN:-}
+      SPRING_AI_MCP_CLIENT_STREAMABLEHTTP_CONNECTIONS_MCPAUTOROUTE_URL: http://autoroutes-mcp:8090
+      SPRING_AI_MCP_CLIENT_STREAMABLEHTTP_CONNECTIONS_MCPAUTOROUTE_ENDPOINT: /mcp
+      # Les deux outils d'écriture d'Autoroutes sont refusés à l'agent en phase 1 : ils ne
+      # s'ouvriront qu'avec l'approbation humaine de la phase 2 (ADR 0004). Les règles
+      # s'ajoutent à celles d'application.yml (spectra_ask, spectra_status).
+      SPRING_APPLICATION_JSON: >-
+        {"kex":{"agent":{"tools":{"rules":{
+        "declarer_anomalies":{"denied":true},
+        "lever_anomalies":{"denied":true}}}}}}
+    volumes:
+      # Connexions MCP chiffrées, mémoire et espace utilisateur.
+      - agent_state:/var/lib/kex
+    healthcheck:
+      # L'image JRE n'a ni curl ni wget.
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8081'"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+      start_interval: 3s
+    stop_grace_period: 35s
+    restart: unless-stopped
+    logging: *logging
+
+  # ═══ Autoroutes ══════════════════════════════════════════════════════════════
+  # Services repris de compose.yaml / compose.hub.yaml d'Autoroutes (v0.5.2), sur le broker de
+  # la suite. Le nom réseau `backend` est conservé en alias : l'image du frontend le résout dans
+  # sa configuration nginx.
+
+  autoroutes-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: supervision
+      POSTGRES_USER: supervision
+      POSTGRES_PASSWORD: ${AUTOROUTES_POSTGRES_PASSWORD:?requis, mot de passe de la base Autoroutes}
+    volumes:
+      - autoroutes_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supervision -d supervision"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    logging: *logging
+    deploy:
+      resources:
+        limits: { memory: 1g }
+
+  autoroutes-backend:
+    <<: *hardened
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:backend-${AUTOROUTES_TAG:-0.5.1}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_API_PORT:-8085}:8080"
+    networks:
+      default:
+        aliases: [backend]
+    environment:
+      DATABASE_URL: jdbc:postgresql://autoroutes-postgres:5432/supervision
+      DATABASE_USER: supervision
+      DATABASE_PASSWORD: ${AUTOROUTES_POSTGRES_PASSWORD:?requis, mot de passe de la base Autoroutes}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Graphe routier embarqué dans l'image : charge estimée des tronçons active.
+      ASSIGNMENT_GRAPH_FILE: ${AUTOROUTES_GRAPH_FILE-/app/bundled-graph/graph.json}
+      # « auth » rend la connexion obligatoire (module auth). Casse la lecture MCP de l'agent en
+      # phase 1 : voir ADR 0004.
+      SPRING_PROFILES_ACTIVE: ${AUTOROUTES_SUPERVISION_PROFILE:-}
+    depends_on:
+      autoroutes-postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    # Arrêt propre : le point de reprise final est écrit avant la sortie.
+    stop_grace_period: 45s
+    deploy:
+      resources:
+        limits: { memory: 1g }
+
+  # Données SIMULÉES. Toute vue de la suite qui en dérive doit le dire.
+  autoroutes-simulator:
+    <<: *hardened
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:simulator-${AUTOROUTES_TAG:-0.5.1}
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SIMULATOR_RATE: ${SIMULATOR_RATE:-80}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits: { memory: 384m }
+
+  autoroutes-mcp:
+    <<: *hardened
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:mcp-anomalies-${AUTOROUTES_TAG:-0.5.1}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_MCP_PORT:-8090}:8090"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      BACKEND_URL: http://autoroutes-backend:8080
+      # Sans jeton en phase 1 (ADR 0004) ; true en phase 2, avec le renouvellement côté Kex.
+      MCP_SECURITY_ENABLED: ${AUTOROUTES_MCP_SECURITY_ENABLED:-false}
+      OIDC_JWK_SET_URI: http://keycloak:8080/realms/supervision/protocol/openid-connect/certs
+      OIDC_ISSUER: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/supervision
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits: { memory: 384m }
+
+  autoroutes-ui:
+    <<: *hardened
+    # Carte et graphe embarqués dans l'image publiée : aucun volume de tuiles à monter.
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:frontend-${AUTOROUTES_TAG:-0.5.1}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_UI_PORT:-8084}:8080"
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    depends_on:
+      autoroutes-backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits: { memory: 128m }
+
+  # ═══ Reverse proxy TLS ═══════════════════════════════════════════════════════
+  # Caddy et son autorité de certification locale : https://<application>.localhost:8443.
+  # Chaque module ajoute ses sites dans proxy/sites/. Pour faire confiance au certificat :
+  #   docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt ./convergence-ca.crt
+
+  proxy:
+    image: caddy:${CADDY_IMAGE_TAG:-2.10-alpine}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${PROXY_HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./proxy/sites/core.caddy:/etc/caddy/sites/core.caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      explorer:
+        condition: service_started
+      agent:
+        condition: service_started
+      autoroutes-ui:
+        condition: service_started
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  kafka_data:
+  explorer_logs:
+  explorer_data:
+  agent_state:
+  autoroutes_postgres:
+  caddy_data:
+  caddy_config:

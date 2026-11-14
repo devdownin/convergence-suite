@@ -1,0 +1,209 @@
+# Module « docs » — SpectraLLM : mémoire documentaire, RAG cité et inférence locale.
+# Surcouche de compose.yaml. Services repris de compose/spectra-hub.yml et spectra-hub.mcp.yml
+# de KafkaExplorer (v2.4.1), la seule pile SpectraLLM que sa CI démarre de bout en bout.
+#
+#   COMPOSE_FILE=compose.yaml:compose.docs.yaml   (dans .env)
+#
+# Ce que le module change dans le cœur :
+#   - l'agent gagne la connexion MCP « spectrallm » (spectra_search, spectra_list_documents,
+#     spectra_preview_document ; spectra_ask et spectra_status restent refusés par Kex) ;
+#   - KafkaExplorer répond au Process Mining avec le modèle local de SpectraLLM (synergie S7).
+#
+# PREMIER DÉMARRAGE : ~4,8 Go de poids de modèles téléchargés, ~16 Go de RAM pour le modèle 7B.
+# Le chat de SpectraLLM reste muet jusqu'à la fin du téléchargement ; rien d'autre n'attend.
+# Sur un portable, préférer le 3B (quatre variables, voir .env.example).
+#
+# LIMITE CONNUE. Le serveur MCP de SpectraLLM exige SPECTRA_API_KEY, mais l'interface web de
+# SpectraLLM n'envoie pas cette clé : ses appels d'API répondent 401. Utiliser l'API (Swagger sur
+# :8089) ou l'agent ; correction à porter dans SpectraLLM.
+services:
+
+  # ─── Branchements dans le cœur ───────────────────────────────────────────────
+
+  agent:
+    depends_on:
+      spectra-api:
+        condition: service_started
+    environment:
+      SPECTRALLM_URL: http://spectra-api:8080
+      SPECTRA_API_KEY: ${SPECTRA_API_KEY:?requis avec le module docs}
+      SPRING_AI_MCP_CLIENT_STREAMABLEHTTP_CONNECTIONS_SPECTRALLM_URL: http://spectra-api:8080
+      SPRING_AI_MCP_CLIENT_STREAMABLEHTTP_CONNECTIONS_SPECTRALLM_ENDPOINT: /mcp
+
+  explorer:
+    environment:
+      # Process Mining par l'endpoint RAG de SpectraLLM (POST /api/query), retrieval coupé :
+      # le prompt d'audit porte déjà les messages analysés.
+      CLAUDE_PROVIDER: SPECTRA
+      CLAUDE_BASE_URL: http://spectra-api:8080
+      CLAUDE_API_KEY: ${SPECTRA_API_KEY:?requis avec le module docs}
+      CLAUDE_USE_RAG: "false"
+      # Un 7B quantifié sur CPU prend des minutes : délai aligné sur celui de SpectraLLM.
+      CLAUDE_REQUEST_TIMEOUT_SECONDS: ${SPECTRA_GENERATION_TIMEOUT:-300}
+      # ~4k jetons, pour tenir dans les 8 192 jetons d'un slot llama.cpp.
+      PROCESS_MINING_PROMPT_CHAR_BUDGET: ${EXPLORER_PROMPT_CHAR_BUDGET:-16000}
+
+  proxy:
+    volumes:
+      - ./proxy/sites/docs.caddy:/etc/caddy/sites/docs.caddy:ro
+
+  # ─── SpectraLLM ──────────────────────────────────────────────────────────────
+
+  # Règle la propriété du volume avant tout autre montage : les images llama.cpp n'ont pas de
+  # /app/data, et un volume initialisé par elles serait vide et en root.
+  spectra-data-init:
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm:${SPECTRA_IMAGE_TAG:-0.12.3}
+    user: root
+    volumes:
+      - spectra_data:/app/data
+    entrypoint: ["sh", "-c", "mkdir -p /app/data/models && chown -R spectra:spectra /app/data"]
+
+  # Base vectorielle de SpectraLLM 0.12.3. Qdrant n'arrive qu'avec la version suivante
+  # (docs/versions.md). Non publiée : lecture ET écriture sur le corpus.
+  chromadb:
+    image: chromadb/chroma:${CHROMADB_IMAGE_TAG:-1.5.9}
+    volumes:
+      - spectra_chroma:/data
+    environment:
+      ANONYMIZED_TELEMETRY: "FALSE"
+      CHROMA_OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8000 && echo -e 'GET /api/v2/heartbeat HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+      start_interval: 3s
+    restart: unless-stopped
+
+  spectra-api:
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm:${SPECTRA_IMAGE_TAG:-0.12.3}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${SPECTRA_API_PORT:-8089}:8080"
+    depends_on:
+      spectra-data-init:
+        condition: service_completed_successfully
+      chromadb:
+        condition: service_healthy
+    environment:
+      # Sans limite de conteneur, MaxRAMPercentage lirait la mémoire de l'hôte.
+      JAVA_OPTS: ${SPECTRA_JAVA_OPTS:--Xms256m -Xmx1024m -XX:+UseZGC}
+      SPECTRA_LLM_PROVIDER: llama-cpp
+      SPECTRA_LLM_CHAT_BASE_URL: http://llm-chat:8081
+      SPECTRA_LLM_EMBEDDING_BASE_URL: http://llm-embed:8082
+      SPECTRA_CHROMADB_BASE_URL: http://chromadb:8000
+      SPECTRA_LLM_MODEL: ${LLM_CHAT_MODEL_NAME:-qwen2.5-7b-instruct}
+      SPECTRA_LLM_CHAT_FILE: ${LLM_CHAT_MODEL_FILE:-Qwen2.5-7B-Instruct-Q4_K_M.gguf}
+      SPECTRA_LLM_EMBEDDING_MODEL: ${LLM_EMBED_MODEL_NAME:-nomic-embed-text}
+      SPECTRA_LLM_EMBEDDING_FILE: ${LLM_EMBED_MODEL_FILE:-embed.gguf}
+      # Serveur MCP en lecture seule ; sans clé, /mcp répond 503.
+      SPECTRA_MCP_ENABLED: "true"
+      SPECTRA_API_KEY: ${SPECTRA_API_KEY:?requis avec le module docs}
+      SPECTRA_PIPELINE_GENERATION_TIMEOUT_SECONDS: ${SPECTRA_GENERATION_TIMEOUT:-300}
+      SPECTRA_STARTUP_AUTO_INSTALL_MODELS: ${SPECTRA_AUTO_INSTALL_MODELS:-true}
+      # Ingestion de topics Kafka : coupée. Indexer toll-events est une décision de la phase 4,
+      # avec son contrat (tâche 4.5).
+      SPECTRA_KAFKA_ENABLED: "false"
+    volumes:
+      - spectra_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      start_interval: 3s
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  # llama.cpp — chat. Non publié : llama-server n'a pas d'authentification.
+  llm-chat:
+    image: ghcr.io/ggml-org/llama.cpp:${LLAMA_CPP_IMAGE_TAG:-server-b9828}
+    depends_on:
+      spectra-data-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./upstream/kafkaexplorer/scripts/spectra-hub/llm-chat.sh:/opt/hub/llm-chat.sh:ro
+      - spectra_data:/app/data:ro
+    environment:
+      LLM_CHAT_MODEL_FILE: ${LLM_CHAT_MODEL_FILE:-Qwen2.5-7B-Instruct-Q4_K_M.gguf}
+      LLM_CHAT_MODEL_NAME: ${LLM_CHAT_MODEL_NAME:-qwen2.5-7b-instruct}
+      # Contexte total divisé par le nombre de slots : 16384/2 = 8192 jetons par requête.
+      LLM_CONTEXT: ${LLM_CONTEXT:-16384}
+      LLM_PARALLEL: ${LLM_PARALLEL:-2}
+      LLM_CHAT_EXTRA_ARGS: ${LLM_CHAT_EXTRA_ARGS:-}
+    entrypoint: ["/bin/sh", "/opt/hub/llm-chat.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # Couvre le chargement du GGUF, pas son téléchargement : rouge au premier démarrage.
+      start_period: 300s
+      start_interval: 5s
+    restart: unless-stopped
+
+  # llama.cpp — embeddings. Un processus par rôle : l'ingestion ne prend pas les slots du chat.
+  llm-embed:
+    image: ghcr.io/ggml-org/llama.cpp:${LLAMA_CPP_IMAGE_TAG:-server-b9828}
+    depends_on:
+      spectra-data-init:
+        condition: service_completed_successfully
+    volumes:
+      - spectra_data:/app/data:ro
+      - ./upstream/kafkaexplorer/scripts/spectra-hub/llm-embed.sh:/opt/hub/llm-embed.sh:ro
+    environment:
+      LLM_EMBED_MODEL_FILE: ${LLM_EMBED_MODEL_FILE:-embed.gguf}
+      LLM_EMBED_PARALLEL: ${LLM_EMBED_PARALLEL:-4}
+      LLM_EMBED_EXTRA_ARGS: ${LLM_EMBED_EXTRA_ARGS:-}
+    entrypoint: ["/bin/sh", "/opt/hub/llm-embed.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8082/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+      start_interval: 3s
+    restart: unless-stopped
+
+  # Télécharge le modèle d'embeddings (~81 Mo), que spectra-api n'installe pas lui-même, et le
+  # modèle de chat seulement si SPECTRA_CHAT_MODEL_URL est renseignée.
+  spectra-models:
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm:${SPECTRA_IMAGE_TAG:-0.12.3}
+    depends_on:
+      spectra-data-init:
+        condition: service_completed_successfully
+    volumes:
+      - spectra_data:/app/data
+      - ./upstream/kafkaexplorer/scripts/spectra-hub/fetch-models.sh:/opt/hub/fetch-models.sh:ro
+    environment:
+      LLM_EMBED_MODEL_FILE: ${LLM_EMBED_MODEL_FILE:-embed.gguf}
+      SPECTRA_EMBED_MODEL_URL: ${SPECTRA_EMBED_MODEL_URL:-https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q4_K_M.gguf}
+      SPECTRA_EMBED_MODEL_SHA256: ${SPECTRA_EMBED_MODEL_SHA256:-}
+      LLM_CHAT_MODEL_FILE: ${LLM_CHAT_MODEL_FILE:-Qwen2.5-7B-Instruct-Q4_K_M.gguf}
+      SPECTRA_CHAT_MODEL_URL: ${SPECTRA_CHAT_MODEL_URL:-}
+      SPECTRA_CHAT_MODEL_SHA256: ${SPECTRA_CHAT_MODEL_SHA256:-}
+    entrypoint: ["/bin/sh", "/opt/hub/fetch-models.sh"]
+
+  # nginx de l'interface ; son amont /api/ → spectra-api:8080 est figé dans l'image, d'où le
+  # nom de service spectra-api à conserver.
+  spectra-ui:
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm-frontend:${SPECTRA_IMAGE_TAG:-0.12.3}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${SPECTRA_UI_PORT:-8088}:80"
+    depends_on:
+      spectra-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      start_interval: 3s
+    restart: unless-stopped
+
+volumes:
+  # Documents, base H2, modèles GGUF, jobs de fine-tuning. `down -v` efface les 4,8 Go de poids.
+  spectra_data:
+  spectra_chroma:

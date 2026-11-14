@@ -1,0 +1,15 @@
+# Reverse proxy TLS de la suite.
+# Certificats émis par l'autorité locale de Caddy pour les noms *.localhost, que les navigateurs
+# et curl résolvent vers 127.0.0.1 sans entrée DNS.
+#
+# Chaque module de la suite monte ses sites dans /etc/caddy/sites/ (voir compose*.yaml).
+{
+	# Autorité locale, pour tous les sites.
+	local_certs
+	# Le conteneur n'a pas à installer sa racine dans un magasin : l'hôte le fait, s'il le veut.
+	skip_install_trust
+	# Le port 80 n'est pas publié : pas de redirection HTTP → HTTPS.
+	auto_https disable_redirects
+}
+
+import /etc/caddy/sites/*.caddy

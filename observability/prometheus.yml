@@ -1,0 +1,49 @@
+# Collecte Prometheus de la suite (module monitoring).
+# Règles d'alerte : upstream/autoroutes/observability/prometheus/alerts.yml, inchangées.
+#
+# LIMITE CONNUE. La règle de mémoire d'Autoroutes additionne le tas de toutes les JVM collectées
+# (`sum(jvm_memory_used_bytes{area="heap"})` sans filtre de job). Avec KafkaExplorer et SpectraLLM
+# collectés, elle mesure toute la suite. Correctif d'une ligne à proposer à Autoroutes : filtrer
+# sur job="backend".
+#
+# Kex-anHarness n'est pas collecté : son /actuator/prometheus exige le bearer de l'API, qu'un
+# fichier versionné ne doit pas porter. À traiter en phase 5 (tâche 5.2), par fichier de secret.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  # Le nom de job « backend » est celui qu'attendent les règles et le tableau de bord d'Autoroutes.
+  - job_name: backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["autoroutes-backend:8080"]
+        labels:
+          application: autoroutes
+
+  - job_name: kafkaexplorer
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["explorer:8080"]
+        labels:
+          application: kafkaexplorer
+
+  # Absent sans le module docs : la cible apparaît alors « down », sans alerte associée.
+  - job_name: spectrallm
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["spectra-api:8080"]
+        labels:
+          application: spectrallm
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
