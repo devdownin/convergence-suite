@@ -1,0 +1,13 @@
+# Module core. Caddy relaie les flux SSE (text/event-stream) sans tampon.
+
+explorer.localhost {
+	reverse_proxy explorer:8080
+}
+
+agent.localhost {
+	reverse_proxy agent:8081
+}
+
+carte.localhost {
+	reverse_proxy autoroutes-ui:8080
+}

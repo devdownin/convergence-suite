@@ -1,0 +1,5 @@
+# Module docs : interface SpectraLLM (qui relaie elle-même /api/ vers spectra-api).
+
+docs.localhost {
+	reverse_proxy spectra-ui:80
+}

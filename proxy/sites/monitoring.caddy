@@ -1,0 +1,6 @@
+# Module monitoring : Grafana seulement. Prometheus et Alertmanager n'authentifient personne et
+# restent sur la boucle locale de l'hôte.
+
+grafana.localhost {
+	reverse_proxy grafana:3000
+}
