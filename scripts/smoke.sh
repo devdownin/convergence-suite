@@ -208,14 +208,17 @@ for connection in "${expected[@]}"; do
   fi
 done
 
-# Déclarée ne veut pas dire jointe : l'agent relit le catalogue d'Autoroutes, avec son propre jeton
-# quand le MCP est sous jeton. C'est la preuve que le renouvellement client_credentials fonctionne.
-preview="$(curl -sS --max-time 60 -H "Authorization: Bearer ${KEX_AGENT_API_KEY:-}" \
-  "$AGENT/api/agent/mcp/servers/mcpautoroute/preview?refresh=true" 2>/dev/null)"
-if grep -q '"consulter_anomalies"' <<<"$preview"; then
-  ok "l'agent lit le catalogue d'Autoroutes"
-else
-  ko "l'agent ne lit pas le catalogue d'Autoroutes" "${preview:0:300}"
+# Déclarée ne veut pas dire jointe : la liste initialise les clients et rend leurs outils. Ceux
+# d'Autoroutes n'y figurent que si l'agent a passé le handshake, avec son propre jeton quand le MCP est
+# sous jeton : c'est la preuve que le renouvellement client_credentials fonctionne.
+if command -v jq >/dev/null 2>&1; then
+  if jq -e 'any(.[]?; .connection == "mcpautoroute" and any(.tools[]?; .name == "consulter_anomalies"))' \
+    <<<"$servers" >/dev/null 2>&1; then
+    ok "l'agent lit le catalogue d'Autoroutes"
+  else
+    ko "l'agent ne lit pas le catalogue d'Autoroutes" \
+      "$(jq -c '.[]? | select(.connection == "mcpautoroute") | {initialized, refreshError, outils: [.tools[]?.name]}' <<<"$servers" 2>/dev/null)"
+  fi
 fi
 
 # ─── 5. Proxy TLS ────────────────────────────────────────────────────────────────

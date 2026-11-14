@@ -24,8 +24,12 @@ supervisor["clientId"] = "kex-supervisor"
 supervisor["name"] = "Kex-anHarness — supervision"
 supervisor["description"] = "Agent de supervision de la suite : déclare et lève des anomalies de gare"
 supervisor["secret"] = "${KEX_SUPERVISOR_CLIENT_SECRET}"
-for champ in ("id", "protocolMappers"):
-    supervisor.pop(champ, None)
+supervisor.pop("id", None)
+# Les mappeurs restent : sans celui des rôles du royaume (revendication « roles »), le jeton n'emporte
+# pas ANOMALY_REPORTER et le MCP d'Autoroutes répond 403. Seuls leurs identifiants sont retirés, que
+# Keycloak attribue à l'import et qui ne peuvent pas être partagés entre deux clients.
+for mapper in supervisor.get("protocolMappers", []):
+    mapper.pop("id", None)
 realm["clients"].append(supervisor)
 
 realm["users"].append({
