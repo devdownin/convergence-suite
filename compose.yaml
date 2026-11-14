@@ -1,4 +1,4 @@
-9# Suite Convergence — module « core » : un broker Kafka, KafkaExplorer, Kex-anHarness, Autoroutes
+# Suite Convergence — module « core » : un broker Kafka, KafkaExplorer, Kex-anHarness, Autoroutes
 # et le reverse proxy TLS. Images publiées uniquement, rien n'est construit.
 #
 #   cp .env.example .env        # puis renseigner les trois secrets marqués « requis »
@@ -287,7 +287,7 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       BACKEND_URL: http://autoroutes-backend:8080
-      # Sans jeton en phase 1 (ADR 0004) ; true en phase 2, avec le renouvellement côté Kex.
+      # Sans jeton hors du module auth : il n'y a alors pas de Keycloak pour en émettre (ADR 0004).
       MCP_SECURITY_ENABLED: ${AUTOROUTES_MCP_SECURITY_ENABLED:-false}
       OIDC_JWK_SET_URI: http://keycloak:8080/realms/supervision/protocol/openid-connect/certs
       OIDC_ISSUER: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/supervision

@@ -25,7 +25,7 @@ Keycloak est le fournisseur d'identité cible de la suite, en reprenant le royau
 Trajectoire en trois paliers :
 
 1. **Phase 1 (cette branche).** Un secret par connexion, injecté par le `.env` de la suite. Le MCP d'Autoroutes reste sans sécurité, mais il n'est joignable que depuis le réseau Compose et la boucle locale. Le module `auth` démarre Keycloak, sans l'imposer aux applications.
-2. **Phase 2.** Kex apprend le renouvellement *client credentials* par connexion (tâche 2.2). Un client Keycloak dédié `kex-supervisor`, doté de `ANOMALY_REPORTER`, donne à l'agent une source `mcp:` distincte (tâche 2.3). Le MCP d'Autoroutes passe en `MCP_SECURITY_ENABLED=true` (`AUTOROUTES_MCP_SECURITY_ENABLED`), dès qu'une image Kex qui renouvelle les jetons est publiée : le code est dans la PR devdownin/kex-anharness#222, l'interrupteur reste éteint par défaut d'ici là.
+2. **Phase 2.** Kex apprend le renouvellement *client credentials* par connexion (tâche 2.2). Un client Keycloak dédié `kex-supervisor`, doté de `ANOMALY_REPORTER`, donne à l'agent une source `mcp:` distincte (tâche 2.3). Le MCP d'Autoroutes passe en `MCP_SECURITY_ENABLED=true` (`AUTOROUTES_MCP_SECURITY_ENABLED`), dès qu'une image Kex qui renouvelle les jetons est publiée. Fait avec Kex `0.13.0` (PR devdownin/kex-anharness#222) : le module `auth` l'active par défaut, `AUTOROUTES_MCP_SECURITY_ENABLED=false` le coupe.
 3. **Phase 5.** OIDC sur les interfaces de Kex, proxy d'authentification devant KafkaExplorer et SpectraLLM, validation de JWT Keycloak sur le `/mcp` de KafkaExplorer (tâche 5.3).
 
 ## Conséquences

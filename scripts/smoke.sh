@@ -5,7 +5,7 @@
 #   1. la santé HTTP de chaque application ;
 #   2. le catalogue MCP de chaque serveur (initialize → notifications/initialized → tools/list) ;
 #   3. que KafkaExplorer voit le topic métier toll-events (critère de la tâche 1.2) ;
-#   4. que l'agent a bien enregistré ses connexions MCP ;
+#   4. que l'agent a bien enregistré ses connexions MCP, et qu'il joint réellement Autoroutes ;
 #   5. que le proxy TLS sert KafkaExplorer et que son /mcp répond sans 426 (critère de la tâche 1.3).
 #
 # Usage : scripts/smoke.sh            (lit .env à la racine du dépôt)
@@ -134,7 +134,30 @@ fi
 step "2. Catalogues MCP"
 check_catalog "KafkaExplorer" "$EXPLORER/mcp" "Authorization: Bearer ${EXPLORER_MCP_AUTH_TOKEN:-}" \
   kex_list_topics kex_describe_topic kex_consumer_lag kex_dlq_diagnosis kex_run_audit kex_trace_key
-check_catalog "Autoroutes" "$AR_MCP/mcp" "" \
+# Avec le module auth, le MCP d'Autoroutes est sous jeton : sans jeton il doit refuser, avec celui du
+# client kex-supervisor (le même que l'agent) il doit répondre. Les deux moitiés comptent : un 200
+# sans jeton dirait que la sécurité n'est pas active, alors que le catalogue serait bien lu.
+ar_auth=""
+if has_module auth && [[ "${AUTOROUTES_MCP_SECURITY_ENABLED:-true}" != false ]]; then
+  if mcp_open "$AR_MCP/mcp" ""; then
+    ko "Autoroutes : MCP sans jeton refusé" "HTTP $MCP_STATUS : la sécurité MCP n'est pas active"
+  elif [[ "$MCP_STATUS" == 401 ]]; then
+    ok "Autoroutes : MCP sans jeton refusé (401)"
+  else
+    ko "Autoroutes : MCP sans jeton refusé" "HTTP $MCP_STATUS au lieu de 401"
+  fi
+  token="$(curl -sS --max-time 15 -d grant_type=client_credentials -d client_id=kex-supervisor \
+    --data-urlencode "client_secret=${KEX_SUPERVISOR_CLIENT_SECRET:-}" \
+    "$KEYCLOAK/realms/supervision/protocol/openid-connect/token" 2>/dev/null \
+    | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)"
+  if [[ -n "$token" ]]; then
+    ok "jeton client_credentials de kex-supervisor"
+    ar_auth="Authorization: Bearer $token"
+  else
+    ko "jeton client_credentials de kex-supervisor" "Keycloak n'a pas émis de jeton"
+  fi
+fi
+check_catalog "Autoroutes" "$AR_MCP/mcp" "$ar_auth" \
   rechercher_gares consulter_anomalies declarer_anomalies lever_anomalies
 if has_module docs; then
   check_catalog "SpectraLLM" "$SPECTRA/mcp" "X-API-Key: ${SPECTRA_KEX_CALLER_KEY:-}" \
@@ -184,6 +207,16 @@ for connection in "${expected[@]}"; do
     ko "connexion $connection absente de /api/agent/mcp/servers" "${servers:0:300}"
   fi
 done
+
+# Déclarée ne veut pas dire jointe : l'agent relit le catalogue d'Autoroutes, avec son propre jeton
+# quand le MCP est sous jeton. C'est la preuve que le renouvellement client_credentials fonctionne.
+preview="$(curl -sS --max-time 60 -H "Authorization: Bearer ${KEX_AGENT_API_KEY:-}" \
+  "$AGENT/api/agent/mcp/servers/mcpautoroute/preview?refresh=true" 2>/dev/null)"
+if grep -q '"consulter_anomalies"' <<<"$preview"; then
+  ok "l'agent lit le catalogue d'Autoroutes"
+else
+  ko "l'agent ne lit pas le catalogue d'Autoroutes" "${preview:0:300}"
+fi
 
 # ─── 5. Proxy TLS ────────────────────────────────────────────────────────────────
 step "5. Proxy TLS"

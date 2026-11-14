@@ -7,7 +7,7 @@ Relevée le 2026-11-14 dans les dépôts sources. La suite épingle des **versio
 | Application | Image(s) | Tag épinglé | Commit du tag | Variable |
 | --- | --- | --- | --- | --- |
 | KafkaExplorer | `compagnonsdudev/kafkaexplorer` | `2.4.1` (2026-11-13) | tag `v2.4.1` | `EXPLORER_IMAGE_TAG` |
-| Kex-anHarness | `compagnonsdudev/kex-agent-ai` | `0.12.1` | tag `v0.13.0 | `KEX_AGENT_IMAGE_TAG` |
+| Kex-anHarness | `compagnonsdudev/kex-agent-ai` | `0.13.0` (2026-11-14) | tag `v0.13.0` | `KEX_AGENT_IMAGE_TAG` |
 | SpectraLLM | `compagnonsdudev/spectrallm`, `compagnonsdudev/spectrallm-frontend` | `0.12.3` (2026-10-19) | tag `v0.12.3` | `SPECTRA_IMAGE_TAG` |
 | Autoroutes | `compagnonsdudev/autoroutes:{backend,simulator,mcp-anomalies,frontend}-<tag>` | `0.5.1` (images ; le tag `0.5.2` n'est pas publié sur Docker Hub) | fichiers repris du tag `v0.5.2` | `AUTOROUTES_TAG` |
 
@@ -42,7 +42,8 @@ Trois serveurs ou clients MCP sur quatre sont déjà sur Spring AI 2.0.2 : l'ali
 | Base vectorielle SpectraLLM | Qdrant | ChromaDB en 0.12.3 ; Qdrant n'est que sur `main` | La suite utilise ChromaDB jusqu'à la prochaine publication de SpectraLLM |
 | Outils MCP SpectraLLM | 6 outils, dont `spectra_read_document` | La sonde de KafkaExplorer n'en attend que 5 en 0.12.3 | `spectra_read_document` à vérifier avant la phase 4 |
 | Numérotation SpectraLLM | `backend/pom.xml` en `1.1.0-SNAPSHOT`, CHANGELOG à 1.13.0 | Tags Git et images en `0.12.x` | Trois numérotations à réconcilier ; la suite suit les tags d'image |
-| Fonctions Kex de la phase 2 | — | `client-credentials` et `harness_*` absents de `0.12.1` | Disponibles à la première version publiée après la PR #222 ; relever `KEX_AGENT_IMAGE_TAG` alors |
+| Fonctions Kex de la phase 2 | — | `client-credentials` et `harness_*` présents en `0.13.0` | MCP d'Autoroutes sous jeton dès que le module `auth` est actif |
+| Fonctions de la phase 3 | Kex : `DECLARE_ANOMALY` (PR #223) ; Autoroutes : `etat_gare` (PR #58), provenance des rejets (PR #59) | Absentes de Kex `0.13.0` (taguée avant #223) et d'Autoroutes `0.5.1` | Overlay `compose.actions.yaml` inutilisable jusqu'aux prochaines publications |
 | Tags Kex-anHarness | — | Un tag `v9.12.1` coexiste avec `v0.12.1` | Probable coquille à supprimer dans le dépôt Kex |
 
 ## Mettre à jour une version
