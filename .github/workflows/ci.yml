@@ -38,7 +38,8 @@ jobs:
             compose.yaml:compose.monitoring.yaml \
             compose.yaml:compose.auth.yaml \
             compose.yaml:compose.docs.yaml:compose.monitoring.yaml:compose.auth.yaml \
-            compose.yaml:compose.docs.yaml:compose.auth.yaml:compose.actions.yaml
+            compose.yaml:compose.docs.yaml:compose.auth.yaml:compose.actions.yaml \
+            compose.yaml:compose.auth.yaml:compose.actions.yaml:compose.e2e.yaml
           do
             echo "→ $files"
             COMPOSE_FILE="$files" docker compose config --quiet
@@ -99,3 +100,40 @@ jobs:
       - name: Arrêt
         if: always()
         run: docker compose down -v
+
+  # Boucle complète sur une vraie pile : gare muette → cycle → décision → approbation → action → vérification.
+  # Le modèle est factice (e2e/fake-llm.py) : aucune clé, résultat reproductible.
+  e2e:
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secrets de test et modules
+        run: |
+          scripts/init-env.sh
+          sed -i "s|^COMPOSE_FILE=.*|COMPOSE_FILE=compose.yaml:compose.auth.yaml:compose.actions.yaml:compose.e2e.yaml|" .env
+
+      - name: Récupération des images
+        run: docker compose pull --quiet
+
+      - name: Démarrage
+        run: docker compose up -d
+
+      - name: TEMPORAIRE — gare muette par arrêt du simulateur (images sans SIMULATOR_SILENT_*)
+        run: sleep 150 && docker compose stop autoroutes-simulator &
+
+      - name: Boucle de bout en bout
+        run: scripts/e2e.sh
+
+      - name: État et journaux en cas d'échec
+        if: failure()
+        run: |
+          docker compose ps --all
+          docker compose logs --no-color --tail 80 fake-llm agent autoroutes-mcp autoroutes-simulator
+
+      - name: Arrêt
+        if: always()
+        run: docker compose down -v
+

@@ -6,7 +6,8 @@
 #
 # Chaîne : le modèle propose {gare, anomalies} → un humain approuve dans la console Kex → declarer_anomalies
 # (arguments fixes : version_attendue absente, la garde de version reste côté Autoroutes) → relecture indépendante
-# par etat_gare : maVersion doit égaler l'eventTime que l'action a rendu.
+# par etat_gare : maVersion doit égaler l'eventTime que l'action a rendu. Le backend d'Autoroutes applique la
+# déclaration en différé : settle relit pendant 15 s avant de conclure (Kex ≥ 0.13.2 ; ignoré avant).
 #
 # Le JSON REMPLACE celui de compose.yaml (une seule variable SPRING_APPLICATION_JSON par conteneur) : les règles de
 # refus des outils d'écriture appelés directement par le modèle y sont donc répétées.
@@ -29,4 +30,5 @@ services:
         "result-pointer":"/maVersion",
         "expected-from-action-pointer":"/eventTime",
         "observed-at-pointer":"/lectureA",
-        "max-age":"5m"}}}}}}}
+        "max-age":"5m",
+        "settle":"15s"}}}}}}}
