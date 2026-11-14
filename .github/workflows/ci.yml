@@ -38,7 +38,8 @@ jobs:
             compose.yaml:compose.monitoring.yaml \
             compose.yaml:compose.auth.yaml \
             compose.yaml:compose.docs.yaml:compose.monitoring.yaml:compose.auth.yaml \
-            compose.yaml:compose.docs.yaml:compose.auth.yaml:compose.actions.yaml
+            compose.yaml:compose.docs.yaml:compose.auth.yaml:compose.actions.yaml \
+            compose.yaml:compose.auth.yaml:compose.actions.yaml:compose.e2e.yaml
           do
             echo "→ $files"
             COMPOSE_FILE="$files" docker compose config --quiet
@@ -99,3 +100,46 @@ jobs:
       - name: Arrêt
         if: always()
         run: docker compose down -v
+
+  # Boucle complète sur une vraie pile : gare muette → cycle → décision → approbation → action → vérification.
+  # Le modèle est factice (e2e/fake-llm.py) : aucune clé, résultat reproductible.
+  e2e:
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secrets de test et modules
+        run: |
+          scripts/init-env.sh
+          sed -i "s|^COMPOSE_FILE=.*|COMPOSE_FILE=compose.yaml:compose.auth.yaml:compose.actions.yaml:compose.e2e.yaml|" .env
+
+      - name: TEMPORAIRE — images construites depuis les PR Kex #225 et Autoroutes #61
+        run: |
+          docker build -q -t compagnonsdudev/kex-agent-ai:e2e https://github.com/devdownin/Kex-anHarness.git#verification-stabilisation
+          docker build -q -t compagnonsdudev/autoroutes:simulator-e2e -f simulator/Dockerfile https://github.com/SteelDevAndroid/autoroutes.git#simulateur-gare-muette
+          docker build -q -t compagnonsdudev/autoroutes:mcp-anomalies-e2e -f mcp-anomalies/Dockerfile https://github.com/SteelDevAndroid/autoroutes.git#simulateur-gare-muette
+          for s in backend frontend; do docker pull -q compagnonsdudev/autoroutes:$s-0.5.3; docker tag compagnonsdudev/autoroutes:$s-0.5.3 compagnonsdudev/autoroutes:$s-e2e; done
+          sed -i -e '/^KEX_AGENT_IMAGE_TAG=/d' -e '/^AUTOROUTES_TAG=/d' .env
+          printf 'KEX_AGENT_IMAGE_TAG=e2e\nAUTOROUTES_TAG=e2e\n' >> .env
+
+      - name: Récupération des images
+        run: docker compose pull --quiet --ignore-pull-failures
+
+      - name: Démarrage
+        run: docker compose up -d
+
+      - name: Boucle de bout en bout
+        run: scripts/e2e.sh
+
+      - name: État et journaux en cas d'échec
+        if: failure()
+        run: |
+          docker compose ps --all
+          docker compose logs --no-color --tail 80 fake-llm agent autoroutes-mcp autoroutes-simulator
+
+      - name: Arrêt
+        if: always()
+        run: docker compose down -v
+

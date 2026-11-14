@@ -1,0 +1,45 @@
+# Banc de bout en bout de la boucle Observer → Décider → Agir → Vérifier (scripts/e2e.sh).
+#
+# S'empile sur auth et actions : COMPOSE_FILE=compose.yaml:compose.auth.yaml:compose.actions.yaml:compose.e2e.yaml
+#
+# Jeu d'essai :
+# - le simulateur fait taire Vienne (GL-BPV-0134, 43 voies, ~1 passage/1,5 s) après E2E_SILENT_AFTER ;
+# - le MCP d'Autoroutes la déclare STALE après 20 s sans passage (au lieu de 5 min) ;
+# - l'agent parle à un modèle factice (e2e/fake-llm.py) qui appelle réellement etat_gare et ne propose
+#   DECLARE_ANOMALY que si la gare y est STALE. Aucune clé de fournisseur, aucun coût, résultat reproductible.
+#
+# Le modèle factice remplace le jugement, pas la chaîne : outils MCP, jeton Keycloak, politique, approbation,
+# action et vérification sont les vrais. Exige Autoroutes ≥ 0.5.4 (gare muette) et Kex ≥ 0.13.2 (settle).
+services:
+  fake-llm:
+    image: python:3.13-alpine
+    command: ["python", "-u", "/app/fake-llm.py"]
+    environment:
+      E2E_STATION: ${E2E_STATION:-GL-BPV-0134}
+      E2E_PROCESS: pipeline-peage
+    volumes:
+      - ./e2e/fake-llm.py:/app/fake-llm.py:ro
+    read_only: true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      retries: 12
+
+  agent:
+    depends_on:
+      fake-llm:
+        condition: service_healthy
+    environment:
+      KEX_AGENT_LLM_PROVIDER: openai
+      OPENROUTER_API_KEY: e2e-sans-valeur
+      OPENROUTER_BASE_URL: http://fake-llm:8000/v1
+      OPENROUTER_MODEL: fake-scripted
+
+  autoroutes-simulator:
+    environment:
+      SIMULATOR_SILENT_STATIONS: ${E2E_STATION:-GL-BPV-0134}
+      SIMULATOR_SILENT_AFTER: ${E2E_SILENT_AFTER:-120s}
+
+  autoroutes-mcp:
+    environment:
+      MCP_STALE_AFTER: 20s
