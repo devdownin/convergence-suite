@@ -42,6 +42,7 @@ Trois serveurs ou clients MCP sur quatre sont déjà sur Spring AI 2.0.2 : l'ali
 | Base vectorielle SpectraLLM | Qdrant | ChromaDB en 0.12.3 ; Qdrant n'est que sur `main` | La suite utilise ChromaDB jusqu'à la prochaine publication de SpectraLLM |
 | Outils MCP SpectraLLM | 6 outils, dont `spectra_read_document` | La sonde de KafkaExplorer n'en attend que 5 en 0.12.3 | `spectra_read_document` à vérifier avant la phase 4 |
 | Numérotation SpectraLLM | `backend/pom.xml` en `1.1.0-SNAPSHOT`, CHANGELOG à 1.13.0 | Tags Git et images en `0.12.x` | Trois numérotations à réconcilier ; la suite suit les tags d'image |
+| Fonctions Kex de la phase 2 | — | `client-credentials` et `harness_*` absents de `0.12.1` | Disponibles à la première version publiée après la PR #222 ; relever `KEX_AGENT_IMAGE_TAG` alors |
 | Tags Kex-anHarness | — | Un tag `v9.12.1` coexiste avec `v0.12.1` | Probable coquille à supprimer dans le dépôt Kex |
 
 ## Mettre à jour une version
