@@ -37,7 +37,8 @@ jobs:
             compose.yaml:compose.docs.yaml \
             compose.yaml:compose.monitoring.yaml \
             compose.yaml:compose.auth.yaml \
-            compose.yaml:compose.docs.yaml:compose.monitoring.yaml:compose.auth.yaml
+            compose.yaml:compose.docs.yaml:compose.monitoring.yaml:compose.auth.yaml \
+            compose.yaml:compose.docs.yaml:compose.auth.yaml:compose.actions.yaml
           do
             echo "→ $files"
             COMPOSE_FILE="$files" docker compose config --quiet
