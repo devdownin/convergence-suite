@@ -1,0 +1,28 @@
+# Surcouche réservée à scripts/test-forecast.ps1.
+services:
+  kafka:
+    ports: !reset []
+  autoroutes-backend:
+    ports: !reset []
+  explorer:
+    ports: !override
+      - "127.0.0.1::8080"
+    environment:
+      EXPLORER_METRICS_REFRESH_RATE: "2000"
+      EXPLORER_FORECASTING_PILOT_INTERVAL: 1m
+      EXPLORER_FORECASTING_INFERENCE_SHADOW_ENABLED: "true"
+
+  forecast-test:
+    build:
+      context: ./scripts
+      dockerfile_inline: |
+        FROM alpine:3.23
+        RUN apk add --no-cache bash curl jq
+    environment:
+      EXPLORER_URL: http://explorer:8080
+      FORECAST_STEP_MS: "5000"
+      FORECAST_WAIT_TIMEOUT: "2400"
+      FORECAST_ENVIRONMENT: ${FORECAST_ENVIRONMENT:-local}
+    volumes:
+      - ./scripts/seed-forecasts.sh:/opt/convergence/seed-forecasts.sh:ro
+    entrypoint: ["bash", "/opt/convergence/seed-forecasts.sh", "--wait"]

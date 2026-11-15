@@ -84,6 +84,20 @@ Pourquoi des surcouches et non des profils : un module doit aussi modifier des s
 
 ### Prévoir le trafic de péage avec Timestral
 
+Avec Docker Desktop en mode conteneurs Linux et Docker Compose 2.24.4 ou plus, lancez depuis PowerShell.
+
+```powershell
+.\scripts\test-forecast.ps1                # Rapide
+.\scripts\test-forecast.ps1 -Mode Complet  # Kafka et les trois séries de péage
+.\scripts\test-forecast.ps1 -Arreter       # Stoppe la pile, conserve les poids et les données
+```
+
+Le mode **Rapide** vérifie que TimesFM et Timestral produisent chacun dix points sur la même série synthétique, dès que les poids sont chargés. Le mode **Complet** configure les trois métriques dans KafkaExplorer et attend les deux prévisions pour chacune. Comptez environ **11 minutes de collecte** pour 128 points avec le pas accéléré de 5 s, en plus du démarrage. Le premier lancement construit l’image d’inférence et télécharge les poids.
+
+Le lanceur crée un projet Compose propre au dossier de travail et génère ses secrets dans `.forecast-test.env`. En mode complet, Docker réserve un port local libre pour KafkaExplorer et le lanceur affiche l’URL. Les deux commandes peuvent être relancées avec les volumes existants.
+
+Pour activer la prévision dans une pile Convergence Suite habituelle, utilisez la procédure suivante.
+
 Dans `.env`, activer le module avec `COMPOSE_FILE=compose.yaml:compose.forecast.yaml` (sous Windows, utiliser le séparateur documenté dans `.env.example`). Pour une installation existante, mettre aussi à jour les tags définis dans `.env` d'après `.env.example` et lancer `scripts/init-env.sh` pour compléter les secrets.
 
 Les [poids Timestral‑28M](https://huggingface.co/mistralai/Timestral-28M/blob/main/LICENSE) sont distribués sous licence Modified MIT. Pour utiliser TimesFM seul, renseigner dans `.env` les trois réglages de désactivation de Timestral indiqués dans `.env.example`.
