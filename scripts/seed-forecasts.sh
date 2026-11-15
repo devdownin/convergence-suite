@@ -33,7 +33,16 @@ rejected_topic="${REJECTED_TOPIC:-toll-events.rejected}"
 horizon="${FORECAST_HORIZON:-10}"
 wait_timeout="${FORECAST_WAIT_TIMEOUT:-3600}"
 
-api() { curl -sS --fail-with-body --max-time 60 -H 'Content-Type: application/json' "$@"; }
+# Une réponse en erreur est recopiée sur stderr : Explorer y dit pourquoi il refuse.
+api() {
+  local out rc=0
+  out="$(curl -sS --fail-with-body --max-time 60 -H 'Content-Type: application/json' "$@")" || rc=$?
+  if (( rc != 0 )); then
+    echo "requête refusée (${*: -1}) : ${out:-sans corps}" >&2
+    return "$rc"
+  fi
+  printf '%s' "$out"
+}
 
 # Explorer démarre après TimesFM : au premier lancement, le temps de télécharger le modèle.
 for _ in $(seq 1 60); do
@@ -51,10 +60,10 @@ if [[ -n "$blocking" ]]; then
   exit 1
 fi
 
-# id | nom | description | paramètres du gabarit (JSON) | gabarit
+# id | nom (format Prometheus, exigé par Explorer) | description | paramètres du gabarit (JSON) | gabarit
 metrics=(
-  "peage-evenements-produits|Péage : événements produits|Offsets produits sur toll-events|{\"measurement\":\"PRODUCED_OFFSETS\",\"topic\":\"toll-events\"}|KAFKA_CLUSTER_COUNT"
-  "peage-taux-rejets|Péage : rejets rapportés aux événements|Offsets de ${rejected_topic} rapportés à ceux de toll-events|{\"leftTopic\":\"${rejected_topic}\",\"rightTopic\":\"toll-events\",\"countBy\":\"OFFSETS\",\"operation\":\"RATIO\"}|TOPIC_COUNT_DELTA"
+  "peage-evenements-produits|peage_evenements_produits|Péage : offsets produits sur toll-events|{\"measurement\":\"PRODUCED_OFFSETS\",\"topic\":\"toll-events\"}|KAFKA_CLUSTER_COUNT"
+  "peage-taux-rejets|peage_taux_rejets|Péage : offsets de ${rejected_topic} rapportés à ceux de toll-events|{\"leftTopic\":\"${rejected_topic}\",\"rightTopic\":\"toll-events\",\"countBy\":\"OFFSETS\",\"operation\":\"RATIO\"}|TOPIC_COUNT_DELTA"
 )
 ids=()
 
@@ -134,12 +143,12 @@ for item in "${approved[@]}"; do
   encoded="$(jq -rn --arg s "$series_id" '$s | @uri')"
   last=""
   while :; do
-    view="$(api "$explorer/api/forecasts/$encoded" || true)"
+    view="$(api "$explorer/api/forecasts/$encoded" 2>/dev/null || true)"
     if jq -e '.result.strategy == "TIMESFM" and ((.result.forecast.points // []) | length > 0)' <<<"$view" >/dev/null 2>&1; then
       echo "prévision TimesFM : $id — $(jq -r '"\(.result.forecast.points | length) points, état \(.result.state), modèle \(.result.forecast.modelId)"' <<<"$view")"
       break
     fi
-    progress="$(api "$explorer/api/forecasts/$encoded/progress" || true)"
+    progress="$(api "$explorer/api/forecasts/$encoded/progress" 2>&1 || true)"
     line="$(jq -r '"\(.state) \(.observedPoints // 0)/\(.requiredPoints) — \(.reason // "")"' <<<"$progress" 2>/dev/null || echo "$progress")"
     [[ "$line" != "$last" ]] && echo "  $id : $line" && last="$line"
     if (( $(date +%s) > deadline )); then
