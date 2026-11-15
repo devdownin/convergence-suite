@@ -46,6 +46,7 @@ Trois serveurs ou clients MCP sur quatre sont déjà sur Spring AI 2.0.2 : l'ali
 | Numérotation SpectraLLM | `backend/pom.xml` en `1.1.0-SNAPSHOT`, CHANGELOG à 1.13.0 | Tags Git et images en `0.12.x` | Trois numérotations à réconcilier ; la suite suit les tags d'image |
 | Fonctions Kex de la phase 2 | — | `client-credentials` et `harness_*` présents dès Kex `0.13.0` | MCP d'Autoroutes sous jeton dès que le module `auth` est actif |
 | Fonctions de la phase 3 | Kex : `DECLARE_ANOMALY` (PR #223) ; Autoroutes : `etat_gare` (PR #58), provenance des rejets (PR #59) | Présentes dans Kex `0.13.1` et Autoroutes `0.5.3`, mais la boucle n'aboutit qu'avec Kex #225 (`governed-only`, `settle`) et Autoroutes #61 (gare muette, `structuredContent`) | Overlay `compose.actions.yaml` à utiliser avec Kex ≥ `0.13.2` et Autoroutes ≥ `0.5.4` : sous `0.13.1`, `governed-only` est ignoré et `declarer_anomalies` redevient visible du modèle |
+| Prévisions (3.1) | KafkaExplorer : PR #565 (offsets produits enregistrés en compteur ; identifiant de série calculé avec les libellés que l'historique enregistre) | Absente de `2.4.1` : la série d'offsets produits est approuvée puis refusée en `INVALID_DATA` | Module `forecast` à utiliser avec la version d'Explorer qui publie #565 ; le workflow `Prévisions` construit Explorer depuis la branche de la PR en attendant |
 | Tags Kex-anHarness | — | Un tag `v9.12.1` coexiste avec `v0.12.1` | Probable coquille à supprimer dans le dépôt Kex |
 
 ## Mettre à jour une version
