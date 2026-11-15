@@ -14,7 +14,7 @@ set -euo pipefail
 AUTOROUTES_REPO="${AUTOROUTES_REPO:-https://github.com/SteelDevAndroid/autoroutes}"
 AUTOROUTES_REF="${AUTOROUTES_REF:-v0.5.2}"
 EXPLORER_REPO="${EXPLORER_REPO:-https://github.com/devdownin/Kafkaexplorer}"
-EXPLORER_REF="${EXPLORER_REF:-v2.4.1}"
+EXPLORER_REF="${EXPLORER_REF:-v0.3.0}"
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 dest="$root/upstream"

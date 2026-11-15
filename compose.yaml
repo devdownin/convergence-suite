@@ -118,7 +118,7 @@ services:
   # ═══ KafkaExplorer ═══════════════════════════════════════════════════════════
 
   explorer:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer:${EXPLORER_IMAGE_TAG:-2.4.1}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer:${EXPLORER_IMAGE_TAG:-0.3.0}
     ports:
       # Boucle locale : KafkaExplorer n'authentifie personne, et POST /api/config peut repointer
       # le cluster à chaud.

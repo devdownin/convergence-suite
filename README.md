@@ -54,7 +54,7 @@ Le cœur (`compose.yaml`) démarre Kafka, KafkaExplorer, Kex-anHarness, Autorout
 | `monitoring` | `compose.monitoring.yaml` | Prometheus, Alertmanager, Grafana d'Autoroutes, étendus à KafkaExplorer et SpectraLLM | ~1 Go |
 | `auth` | `compose.auth.yaml` | Keycloak, royaume `supervision` d'Autoroutes | ~1 Go |
 | `actions` | `compose.actions.yaml` | Déclaration d'anomalie gouvernée : proposition du modèle, validation humaine, relecture par `etat_gare`. Exige `auth`, Kex ≥ `0.13.2` et Autoroutes ≥ `0.5.4` | négligeable |
-| `forecast` | `compose.forecast.yaml` | Prévisions TimesFM de KafkaExplorer : historique PostgreSQL, inférence CPU construite depuis les sources d'Explorer au tag épinglé, approbation à chaud. Exige KafkaExplorer avec la PR #565 (> `2.4.1`) : sous `2.4.1`, aucune série d'offsets produits ne reçoit de prévision | 4 CPU, ~8 Go de RAM ; build et modèle au premier démarrage |
+| `forecast` | `compose.forecast.yaml` | Prévisions TimesFM de KafkaExplorer : historique PostgreSQL, inférence CPU construite depuis les sources d'Explorer au tag épinglé, approbation à chaud. Exige KafkaExplorer ≥ `0.3.0` (publiée après `2.4.1`) : sous `2.4.1`, aucune série d'offsets produits ne reçoit de prévision | 4 CPU, ~8 Go de RAM ; build et modèle au premier démarrage |
 | `e2e` | `compose.e2e.yaml` | Jeu d'essai de la boucle complète : gare muette au simulateur, modèle factice scripté, seuil de silence court. Exige `auth` et `actions`. Pour `scripts/e2e.sh`, pas pour un usage réel | négligeable |
 
 ```bash

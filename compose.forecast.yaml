@@ -29,9 +29,9 @@ services:
       - forecast_private
 
   forecast-model-prefetch:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-2.4.1}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-0.3.0}
     build:
-      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-2.4.1}:services/timesfm
+      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-0.3.0}:services/timesfm
     restart: "no"
     read_only: true
     tmpfs:
@@ -45,11 +45,11 @@ services:
     command: ["exec /app/.venv/bin/python -m kex_timesfm.prefetch"]
 
   timesfm:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-2.4.1}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-0.3.0}
     # Même build que forecast-model-prefetch, servi par le cache : sans lui, Compose tenterait de
     # tirer une image qui n'est publiée nulle part.
     build:
-      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-2.4.1}:services/timesfm
+      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-0.3.0}:services/timesfm
     restart: unless-stopped
     read_only: true
     tmpfs:
