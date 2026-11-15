@@ -1,5 +1,10 @@
 # Convergence Suite
 
+[![Site web](https://img.shields.io/badge/Site_web-Convergence_Suite-274DCC)](https://devdownin.github.io/convergence-suite/)
+[![Intégration continue](https://github.com/devdownin/convergence-suite/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/devdownin/convergence-suite/actions/workflows/ci.yml)
+[![Publication GitHub Pages](https://github.com/devdownin/convergence-suite/actions/workflows/jekyll-gh-pages.yml/badge.svg?branch=main&event=push)](https://github.com/devdownin/convergence-suite/actions/workflows/jekyll-gh-pages.yml)
+[![Licence GPL v3](https://img.shields.io/badge/Licence-GPL_v3-326F5C)](LICENSE)
+
 Assemblage de quatre applications en une suite cohérente, à partir de leurs images publiées :
 
 | Application | Rôle dans la suite | Dépôt |
