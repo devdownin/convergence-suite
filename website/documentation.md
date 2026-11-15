@@ -34,17 +34,40 @@ Le script d’initialisation génère le fichier `.env` et les secrets locaux. U
 
 Les modules s’activent en ajoutant leurs fichiers à `COMPOSE_FILE` dans `.env`. Consultez le [README du dépôt]({{ site.project_repository }}#modules) pour les versions minimales et les ressources de chaque module.
 
-<h2 id="scenario">Scénario de gare muette</h2>
+<h2 id="scenario">Rejouer le scénario de gare muette</h2>
 
-Depuis la racine du dépôt, lancez le scénario avec les surcouches d’identité, d’action et de simulation.
+Le scénario se lance sans clé de fournisseur IA. Prérequis : Docker Engine 25+, Docker Compose 2.20+, Bash, curl, OpenSSL et jq.
+
+Depuis la racine du dépôt, initialisez la configuration.
 
 ```sh
-export COMPOSE_FILE=compose.yaml:compose.auth.yaml:compose.actions.yaml:compose.e2e.yaml
+scripts/init-env.sh
+```
+
+Dans le fichier `.env`, remplacez la ligne `COMPOSE_FILE` par celle-ci. Le script relit ce fichier au lancement.
+
+```dotenv
+COMPOSE_FILE=compose.yaml:compose.auth.yaml:compose.actions.yaml:compose.e2e.yaml
+```
+
+Démarrez la pile et lancez le test.
+
+```sh
 docker compose up -d
 scripts/e2e.sh
 ```
 
-Le simulateur interrompt les événements d’une gare. Le modèle factice appelle l’outil MCP `etat_gare` et propose une déclaration lorsque l’état est `STALE`. Le script approuve la proposition et attend le résultat `VERIFIED`, qui confirme l’application de la déclaration puis sa relecture.
+Le simulateur cesse d’émettre pour la gare de Vienne (`GL-BPV-0134`). Le modèle factice appelle `etat_gare` et propose une déclaration lorsque l’état est `STALE`. Le script vérifie que la décision est en attente de validation, puis l’approuve comme le ferait un opérateur. Autoroutes enregistre la déclaration et l’agent relit la version de la gare pour confirmer son application.
+
+Le test réussit quand la décision atteint l’état `VERIFIED`. Le journal se termine par « déclaration appliquée par Autoroutes et vérifiée par relecture indépendante ». Dans le [journal de démonstration]({{ site.project_repository }}/actions/runs/43702972938/job/132777968691), cette boucle a pris 118 secondes après le lancement du script. Le premier démarrage de la pile peut prendre davantage de temps selon le téléchargement des images.
+
+Pour arrêter la pile :
+
+```sh
+docker compose down
+```
+
+[Voir les quatre étapes de la démonstration]({{ '/' | relative_url }}#demonstration) · [Lire le script de vérification]({{ site.project_repository }}/blob/{{ site.project_branch }}/scripts/e2e.sh)
 
 ## Références
 
