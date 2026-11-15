@@ -52,14 +52,14 @@ jobs:
           docker run --rm \
             -v "$PWD/proxy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             -v "$PWD/proxy/sites:/etc/caddy/sites:ro" \
-            caddy:2.10-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+            caddy:2.11.9-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Règles Prometheus et collecte
         run: |
           docker run --rm --entrypoint promtool \
             -v "$PWD/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
             -v "$PWD/upstream/autoroutes/observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro" \
-            prom/prometheus:v3.15.1 check config /etc/prometheus/prometheus.yml
+            prom/prometheus:v3.16.0 check config /etc/prometheus/prometheus.yml
 
   # Démarre la suite et lance le test de fumée (tâche 1.4), sans puis avec Keycloak : le module auth
   # met le MCP d'Autoroutes sous jeton, et le smoke vérifie alors que l'agent passe avec le sien.

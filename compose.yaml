@@ -118,7 +118,7 @@ services:
   # ═══ KafkaExplorer ═══════════════════════════════════════════════════════════
 
   explorer:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer:${EXPLORER_IMAGE_TAG:-0.3.0}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer:${EXPLORER_IMAGE_TAG:-2.5.0}
     ports:
       # Boucle locale : KafkaExplorer n'authentifie personne, et POST /api/config peut repointer
       # le cluster à chaud.
@@ -217,7 +217,7 @@ services:
   # sa configuration nginx.
 
   autoroutes-postgres:
-    image: postgres:17-alpine
+    image: postgres:17.12-alpine
     environment:
       POSTGRES_DB: supervision
       POSTGRES_USER: supervision
@@ -237,7 +237,7 @@ services:
 
   autoroutes-backend:
     <<: *hardened
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:backend-${AUTOROUTES_TAG:-0.5.4}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:backend-${AUTOROUTES_TAG:-0.6.0}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_API_PORT:-8085}:8080"
     networks:
@@ -267,7 +267,7 @@ services:
   # Données SIMULÉES. Toute vue de la suite qui en dérive doit le dire.
   autoroutes-simulator:
     <<: *hardened
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:simulator-${AUTOROUTES_TAG:-0.5.4}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:simulator-${AUTOROUTES_TAG:-0.6.0}
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SIMULATOR_RATE: ${SIMULATOR_RATE:-80}
@@ -281,7 +281,7 @@ services:
 
   autoroutes-mcp:
     <<: *hardened
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:mcp-anomalies-${AUTOROUTES_TAG:-0.5.4}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:mcp-anomalies-${AUTOROUTES_TAG:-0.6.0}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_MCP_PORT:-8090}:8090"
     environment:
@@ -301,7 +301,7 @@ services:
   autoroutes-ui:
     <<: *hardened
     # Carte et graphe embarqués dans l'image publiée : aucun volume de tuiles à monter.
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:frontend-${AUTOROUTES_TAG:-0.5.4}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/autoroutes:frontend-${AUTOROUTES_TAG:-0.6.0}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${AUTOROUTES_UI_PORT:-8084}:8080"
     tmpfs:
@@ -320,7 +320,7 @@ services:
   #   docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt ./convergence-ca.crt
 
   proxy:
-    image: caddy:${CADDY_IMAGE_TAG:-2.10-alpine}
+    image: caddy:${CADDY_IMAGE_TAG:-2.11.9-alpine}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${PROXY_HTTPS_PORT:-8443}:443"
     volumes:

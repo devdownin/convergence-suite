@@ -9,7 +9,7 @@
 services:
 
   prometheus:
-    image: prom/prometheus:${PROMETHEUS_IMAGE_TAG:-v3.15.1}
+    image: prom/prometheus:${PROMETHEUS_IMAGE_TAG:-v3.16.0}
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -31,7 +31,7 @@ services:
         limits: { memory: 512m }
 
   alertmanager:
-    image: prom/alertmanager:${ALERTMANAGER_IMAGE_TAG:-v0.34.2}
+    image: prom/alertmanager:${ALERTMANAGER_IMAGE_TAG:-v0.35.0}
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
@@ -52,7 +52,7 @@ services:
 
   # Grafana est sous licence AGPL-3.0 (voir docs/docker.md d'Autoroutes).
   grafana:
-    image: grafana/grafana:${GRAFANA_IMAGE_TAG:-13.3.0}
+    image: grafana/grafana:${GRAFANA_IMAGE_TAG:-13.3.1}
     depends_on:
       prometheus:
         condition: service_healthy

@@ -1,18 +1,19 @@
 name: Prévisions
 
-# Banc de la tâche 3.1 : vraie pile de prévision (PostgreSQL + TimesFM construit depuis KafkaExplorer),
-# métriques de péage créées et approuvées par scripts/seed-forecasts.sh, réussite seulement quand
-# TimesFM a rendu une prévision sur chaque série.
+# Banc de prévision : PostgreSQL, TimesFM et Timestral, avec les métriques de péage créées et
+# approuvées par scripts/seed-forecasts.sh. Les deux modèles doivent répondre pour chaque série.
 #
-# Hors de la CI de chaque PR : le build de TimesFM, le téléchargement du modèle et les 128 points
-# d'historique exigés avant la première prévision prennent une demi-heure.
+# Le banc est ciblé sur les fichiers ci-dessous : il attend le téléchargement des poids et
+# 128 points d’historique avant la première prévision.
 on:
   workflow_dispatch:
   schedule:
     - cron: "17 3 * * 1"
   pull_request:
     paths:
+      - compose.yaml
       - compose.forecast.yaml
+      - .env.example
       - scripts/seed-forecasts.sh
       - .github/workflows/forecast.yml
 
@@ -47,20 +48,16 @@ jobs:
           ENV
 
       - name: Images publiées
-        run: docker compose pull --quiet --ignore-pull-failures
-
-      # Après le pull, sinon l'image publiée écraserait celle-ci sous le même tag.
-      - name: TEMPORAIRE — Explorer construit depuis KafkaExplorer #567 (taux de rejet prévisible)
-        run: docker build -q -t compagnonsdudev/kafkaexplorer:0.3.0 https://github.com/devdownin/kafkaexplorer.git#e646f717c9d229f018e4686311ebed132982244c
+        run: docker compose pull --quiet --ignore-buildable
 
       - name: Construction de TimesFM
-        run: docker compose build timesfm
+        run: docker compose build timesfm forecast-model-prefetch
 
       # Explorer attend TimesFM sain, donc la fin du téléchargement du modèle.
       - name: Démarrage (téléchargement du modèle compris)
         run: docker compose up -d
 
-      - name: Métriques, approbation, première prévision TimesFM
+      - name: Métriques, approbation et première prévision des deux modèles
         env:
           FORECAST_WAIT_TIMEOUT: "2400"
         run: scripts/seed-forecasts.sh --wait
