@@ -1,0 +1,17 @@
+title: Convergence Suite
+description: "Une suite open source pour observer des flux Kafka, enquêter avec des agents IA et suivre des événements sur une carte."
+lang: fr
+url: https://devdownin.github.io
+baseurl: /convergence-suite
+repository: devdownin/convergence-suite
+project_repository: https://github.com/devdownin/convergence-suite
+project_profile: https://github.com/devdownin
+project_branch: main
+theme: null
+markdown: kramdown
+plugins:
+  - jekyll-seo-tag
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
