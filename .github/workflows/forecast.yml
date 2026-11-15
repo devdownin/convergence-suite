@@ -50,8 +50,9 @@ jobs:
         run: docker compose pull --quiet --ignore-pull-failures
 
       # Après le pull, sinon l'image publiée écraserait celle-ci sous le même tag.
-      - name: TEMPORAIRE — Explorer construit depuis le correctif des offsets produits (KafkaExplorer, branche fix/produced-offsets-counter-history)
-        run: docker build -q -t compagnonsdudev/kafkaexplorer:2.4.1 https://github.com/devdownin/kafkaexplorer.git#fix/produced-offsets-counter-history
+      # Commit de fusion de KafkaExplorer #565, épinglé : la branche du correctif est supprimée, et main bougerait.
+      - name: TEMPORAIRE — Explorer construit depuis KafkaExplorer #565, en attendant sa publication
+        run: docker build -q -t compagnonsdudev/kafkaexplorer:2.4.1 https://github.com/devdownin/kafkaexplorer.git#933ea320272c3396ccb42a08fc8a5345c199395e
 
       - name: Construction de TimesFM
         run: docker compose build timesfm
