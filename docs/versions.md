@@ -17,6 +17,8 @@ Images d'infrastructure :
 | --- | --- | --- |
 | Kafka | `apache/kafka:4.4.0` | Autoroutes ; voir ADR 0003 |
 | PostgreSQL (Autoroutes) | `postgres:17-alpine` | Autoroutes |
+| TimesFM (module forecast) | `compagnonsdudev/kafkaexplorer-timesfm:<tag d'Explorer>`, construite localement depuis `services/timesfm` au tag `v<EXPLORER_IMAGE_TAG>` | Aucune image publiée ; même tag que le client d'Explorer, pour un contrat identique |
+| PostgreSQL (prévisions) | `postgres:17.6-alpine` | `compose/forecasts.yml` de KafkaExplorer |
 | ChromaDB (SpectraLLM) | `chromadb/chroma:1.5.9` | Pile `spectra-hub` de KafkaExplorer |
 | llama.cpp (SpectraLLM) | `ghcr.io/ggml-org/llama.cpp:server-b9828` | Pile `spectra-hub` de KafkaExplorer |
 | Reverse proxy | `caddy:2.10-alpine` | Suite |

@@ -1,21 +1,28 @@
 #!/usr/bin/env bash
 # Crée les métriques de péage dans KafkaExplorer puis approuve leurs séries pour TimesFM (tâche 3.1).
 #
-# NON VÉRIFIÉ DE BOUT EN BOUT : écrit contre les contrats lus dans le code de KafkaExplorer 2.4.1
-# (POST /api/metrics, GET /api/forecasts/candidates, POST /api/forecasts/series), sans pile en marche.
-# Premier lancement : lire la sortie, ouvrir « Metrics Forecast » dans la console.
-#
-# Prérequis : pile de prévision de KafkaExplorer (historique PostgreSQL + TimesFM, compose/forecasts.yml
-# de KafkaExplorer) avec `runtime-approval` actif. Sans eux, l'approbation répond 409 avec sa raison.
+# Prérequis : module forecast (compose.forecast.yaml). Sans lui, la préparation le dit et le script
+# s'arrête avant d'écrire quoi que ce soit.
 #
 # Ce que ce script mesure — et ce qu'il ne mesure pas :
-#   - débit du topic toll-events (offsets produits) ;
-#   - rejets rapportés aux événements (topic de rejets, rapport d'offsets).
-# Les entrées/sorties par minute et par gare, et le taux d'ANOMALY_REPORT, demandent du SQL Flink sur le
-# contenu des messages : ils ne sont pas devinés ici, à écrire avec l'assistant de la console.
+#   - débit du topic toll-events (offsets produits, prévus comme un taux) ;
+#   - rejets rapportés aux événements (offsets du topic de rejets / offsets de toll-events).
+# Les entrées/sorties par gare et le taux d'ANOMALY_REPORT demandent du SQL Flink sur le contenu des
+# messages : le gabarit SQL brut n'est pas éligible à la prévision (portée non vérifiable), donc ils
+# restent hors de ce script.
 #
-# Usage : scripts/seed-forecasts.sh        (Explorer sur http://localhost:8080)
+# Usage : scripts/seed-forecasts.sh          crée et approuve, puis rend la main
+#         scripts/seed-forecasts.sh --wait   attend en plus une prévision TimesFM sur chaque série
+#
+# Relançable : une métrique ou une série déjà présente est gardée telle quelle.
 set -euo pipefail
+
+wait_forecast=false
+case "${1:-}" in
+  "") ;;
+  --wait) wait_forecast=true ;;
+  *) echo "Usage : $0 [--wait]" >&2; exit 2 ;;
+esac
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck disable=SC1091
@@ -23,20 +30,38 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 explorer="${EXPLORER_URL:-http://localhost:${EXPLORER_PORT:-8080}}"
 environment="${FORECAST_ENVIRONMENT:-local}"
 rejected_topic="${REJECTED_TOPIC:-toll-events.rejected}"
-step_ms="${FORECAST_STEP_MS:-60000}"
 horizon="${FORECAST_HORIZON:-10}"
+wait_timeout="${FORECAST_WAIT_TIMEOUT:-3600}"
 
 api() { curl -sS --fail-with-body --max-time 60 -H 'Content-Type: application/json' "$@"; }
+
+# Explorer démarre après TimesFM : au premier lancement, le temps de télécharger le modèle.
+for _ in $(seq 1 60); do
+  curl -fsS -o /dev/null --max-time 5 "$explorer/api/metrics" 2>/dev/null && break
+  sleep 5
+done
+
+# 1. PostgreSQL et TimesFM répondent-ils ? Les autres contrôles (séries, MCP…) ne bloquent pas ici.
+readiness="$(api -X POST "$explorer/api/forecasts/preparation/probe")"
+blocking="$(jq -r '.checks[]? | select((.id == "postgres" or .id == "timesfm") and .state != "READY")
+  | "  \(.state)  \(.id) — \(.detail // "")\(if .action then " → " + .action else "" end)"' <<<"$readiness")"
+if [[ -n "$blocking" ]]; then
+  echo "pile de prévision indisponible (module forecast actif ?) :" >&2
+  echo "$blocking" >&2
+  exit 1
+fi
 
 # id | nom | description | paramètres du gabarit (JSON) | gabarit
 metrics=(
   "peage-evenements-produits|Péage : événements produits|Offsets produits sur toll-events|{\"measurement\":\"PRODUCED_OFFSETS\",\"topic\":\"toll-events\"}|KAFKA_CLUSTER_COUNT"
   "peage-taux-rejets|Péage : rejets rapportés aux événements|Offsets de ${rejected_topic} rapportés à ceux de toll-events|{\"leftTopic\":\"${rejected_topic}\",\"rightTopic\":\"toll-events\",\"countBy\":\"OFFSETS\",\"operation\":\"RATIO\"}|TOPIC_COUNT_DELTA"
 )
+ids=()
 
 existing="$(api "$explorer/api/metrics")"
 for entry in "${metrics[@]}"; do
   IFS='|' read -r id name description params template <<<"$entry"
+  ids+=("$id")
   if jq -e --arg id "$id" 'any(.[]?; .id == $id)' <<<"$existing" >/dev/null 2>&1; then
     echo "métrique déjà présente : $id"
     continue
@@ -47,34 +72,81 @@ for entry in "${metrics[@]}"; do
   echo "métrique créée : $id"
 done
 
-# L'historique doit enrôler la métrique avant qu'elle soit candidate : on laisse deux cycles de collecte.
-echo "attente de l'enrôlement par l'historique (jusqu'à 3 min)…"
+# 2. Une métrique n'est candidate qu'après une collecte sans erreur : on attend qu'elles le soient toutes.
+echo "attente de l'éligibilité des métriques (jusqu'à 3 min)…"
+ids_json="$(printf '%s\n' "${ids[@]}" | jq -R . | jq -s .)"
 candidates=""
 for _ in $(seq 1 18); do
   candidates="$(api "$explorer/api/forecasts/candidates")"
-  jq -e 'any(.metrics[]?; (.metricId | startswith("peage-")) and .eligible)' <<<"$candidates" >/dev/null 2>&1 && break
+  jq -e --argjson ids "$ids_json" \
+    '[.metrics[]? | select(.metricId as $m | $ids | index($m)) | select(.eligible)] | length == ($ids | length)' \
+    <<<"$candidates" >/dev/null 2>&1 && break
   sleep 10
 done
+if [[ "$(jq -r '.applyUnavailable // empty' <<<"$candidates")" != "" ]]; then
+  echo "approbation impossible : $(jq -r .applyUnavailable <<<"$candidates")" >&2
+  exit 1
+fi
 
 status=0
-for entry in "${metrics[@]}"; do
-  IFS='|' read -r id _ <<<"$entry"
+approved=()
+current="$(api "$explorer/api/forecasts")"
+for id in "${ids[@]}"; do
+  existing_series="$(jq -r --arg id "$id" --arg env "$environment" \
+    'first(.series[]? | select(.metricId == $id and .environment == $env) | .seriesId) // empty' <<<"$current")"
+  if [[ -n "$existing_series" ]]; then
+    echo "série déjà approuvée : $id → $existing_series"
+    approved+=("$id|$existing_series")
+    continue
+  fi
   candidate="$(jq -c --arg id "$id" '.metrics[]? | select(.metricId == $id)' <<<"$candidates")"
   if [[ -z "$candidate" ]] || [[ "$(jq -r .eligible <<<"$candidate")" != "true" ]]; then
     echo "NON APPROUVÉE : $id — $(jq -r '(.blockers // ["pas candidate : historique non activé ou métrique non enrôlée"]) | join("; ")' <<<"${candidate:-null}")" >&2
     status=1
     continue
   fi
+  # Le pas proposé par Explorer tient deux collectes par seau : plus court, la préparation refuserait la
+  # série pour des trous que personne n'a choisis.
+  step_ms="${FORECAST_STEP_MS:-$(jq -r .suggestedStepMillis <<<"$candidate")}"
   body="$(jq -n --argjson c "$candidate" --arg env "$environment" --arg cluster "$(jq -r .clusterId <<<"$candidates")" \
     --arg collector "$(jq -r .collectorId <<<"$candidates")" --argjson step "$step_ms" --argjson horizon "$horizon" \
     '{metricId:$c.metricId, definitionVersion:$c.definitionVersion, environment:$env, unit:$c.unit,
       clusterId:$cluster, collectorId:$collector, topics:$c.topics, groups:$c.groups,
       stepMillis:$step, horizon:$horizon, threshold:null, direction:"ABOVE", confirmed:true, seasonality:"NONE"}')"
   if answer="$(api -X POST --data "$body" "$explorer/api/forecasts/series")"; then
-    echo "série approuvée : $id → $(jq -r '.seriesId // .' <<<"$answer")"
+    series_id="$(jq -r '.seriesId' <<<"$answer")"
+    echo "série approuvée : $id → $series_id (pas ${step_ms} ms)"
+    approved+=("$id|$series_id")
   else
     echo "NON APPROUVÉE : $id — $answer" >&2
     status=1
   fi
 done
-exit "$status"
+
+if ! $wait_forecast || [[ $status -ne 0 ]]; then
+  exit "$status"
+fi
+
+# 3. Une prévision existe quand TimesFM a répondu sur la série : pas avant 128 points d'historique.
+deadline=$(( $(date +%s) + wait_timeout ))
+for item in "${approved[@]}"; do
+  IFS='|' read -r id series_id <<<"$item"
+  encoded="$(jq -rn --arg s "$series_id" '$s | @uri')"
+  last=""
+  while :; do
+    view="$(api "$explorer/api/forecasts/$encoded" || true)"
+    if jq -e '.result.strategy == "TIMESFM" and ((.result.forecast.points // []) | length > 0)' <<<"$view" >/dev/null 2>&1; then
+      echo "prévision TimesFM : $id — $(jq -r '"\(.result.forecast.points | length) points, état \(.result.state), modèle \(.result.forecast.modelId)"' <<<"$view")"
+      break
+    fi
+    progress="$(api "$explorer/api/forecasts/$encoded/progress" || true)"
+    line="$(jq -r '"\(.state) \(.observedPoints // 0)/\(.requiredPoints) — \(.reason // "")"' <<<"$progress" 2>/dev/null || echo "$progress")"
+    [[ "$line" != "$last" ]] && echo "  $id : $line" && last="$line"
+    if (( $(date +%s) > deadline )); then
+      echo "ÉCHEC : pas de prévision TimesFM pour $id après ${wait_timeout} s — dernier état : $line" >&2
+      jq -c '.result | {state, strategy, reason}' <<<"$view" >&2 2>/dev/null || true
+      exit 1
+    fi
+    sleep 20
+  done
+done

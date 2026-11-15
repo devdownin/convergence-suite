@@ -1,0 +1,114 @@
+# Module forecast — prévisions TimesFM de KafkaExplorer (tâche 3.1).
+#
+# Historique des métriques dans PostgreSQL, inférence TimesFM sur CPU, approbation à chaud depuis la
+# console (« Metrics » → « Prepare a forecast ») ou par scripts/seed-forecasts.sh.
+#
+# TimesFM n'a pas d'image publiée : il se construit depuis les sources de KafkaExplorer, au tag qui
+# correspond à l'image d'Explorer, pour que client et service parlent le même contrat. Le premier
+# démarrage télécharge le modèle épinglé (vérifié par SHA-256) dans le volume timesfm_models.
+# Ressources : 4 CPU et 8 Gio par défaut (TIMESFM_CPUS, TIMESFM_MEM_LIMIT).
+#
+# Seul forecast-model-prefetch sort sur Internet ; PostgreSQL et le service d'inférence restent sur un
+# réseau interne, sans port publié.
+services:
+  forecast-postgres:
+    image: postgres:17.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: forecasts
+      POSTGRES_USER: forecasts
+      POSTGRES_PASSWORD: ${FORECAST_POSTGRES_PASSWORD:?requis, scripts/init-env.sh le génère}
+    volumes:
+      - forecast_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forecasts -d forecasts"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - forecast_private
+
+  forecast-model-prefetch:
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-2.4.1}
+    build:
+      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-2.4.1}:services/timesfm
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+    environment:
+      TIMESFM_TOKEN: ${TIMESFM_TOKEN:?requis, scripts/init-env.sh le génère}
+      TIMESFM_CACHE_DIR: /models
+      HF_HOME: /models
+    volumes:
+      - timesfm_models:/models
+    command: ["exec /app/.venv/bin/python -m kex_timesfm.prefetch"]
+
+  timesfm:
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-2.4.1}
+    # Même build que forecast-model-prefetch, servi par le cache : sans lui, Compose tenterait de
+    # tirer une image qui n'est publiée nulle part.
+    build:
+      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-2.4.1}:services/timesfm
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+    environment:
+      TIMESFM_TOKEN: ${TIMESFM_TOKEN:?requis, scripts/init-env.sh le génère}
+      TIMESFM_CACHE_DIR: /models
+      HF_HOME: /models
+      TIMESFM_THREADS: ${TIMESFM_THREADS:-4}
+    volumes:
+      - timesfm_models:/models
+    command: ["exec /app/.venv/bin/uvicorn kex_timesfm.app:application --factory --host 0.0.0.0 --port 8000"]
+    cpus: ${TIMESFM_CPUS:-4.0}
+    mem_limit: ${TIMESFM_MEM_LIMIT:-8g}
+    depends_on:
+      forecast-model-prefetch:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 5m
+    networks:
+      - forecast_private
+
+  explorer:
+    depends_on:
+      forecast-postgres:
+        condition: service_healthy
+      timesfm:
+        condition: service_healthy
+    environment:
+      EXPLORER_FORECASTING_INFERENCE_ENABLED: "true"
+      EXPLORER_FORECASTING_INFERENCE_SERVICE_URL: http://timesfm:8000
+      EXPLORER_FORECASTING_INFERENCE_TOKEN: ${TIMESFM_TOKEN}
+      EXPLORER_FORECASTING_INFERENCE_TIMEOUT: ${TIMESFM_TIMEOUT:-35s}
+      EXPLORER_FORECASTING_HISTORY_ENABLED: "true"
+      EXPLORER_FORECASTING_HISTORY_JDBC_URL: jdbc:postgresql://forecast-postgres:5432/forecasts
+      EXPLORER_FORECASTING_HISTORY_USERNAME: forecasts
+      EXPLORER_FORECASTING_HISTORY_PASSWORD: ${FORECAST_POSTGRES_PASSWORD}
+      # Ces identités entrent dans chaque identifiant de série : les changer orphelinerait l'historique.
+      EXPLORER_FORECASTING_HISTORY_CLUSTER_ID: ${FORECAST_CLUSTER_ID:-local}
+      EXPLORER_FORECASTING_HISTORY_COLLECTOR_ID: ${FORECAST_COLLECTOR_ID:-kafkaexplorer}
+      # Approbation depuis la console ou l'API, sans fichier ni redémarrage.
+      EXPLORER_FORECASTING_PILOT_RUNTIME_APPROVAL: "true"
+      EXPLORER_FORECASTING_PILOT_INTERVAL: ${FORECAST_PILOT_INTERVAL:-5m}
+      # Cadence de collecte des métriques : elle borne le pas d'échantillonnage utilisable.
+      EXPLORER_METRICS_REFRESH_RATE: ${FORECAST_METRICS_REFRESH_MS:-30000}
+      # Prévisions lisibles par l'agent (outils MCP de prévision), pour cet environnement seulement.
+      EXPLORER_MCP_ALLOWED_FORECAST_ENVIRONMENTS: ${FORECAST_ENVIRONMENT:-local}
+    networks:
+      - default
+      - forecast_private
+
+networks:
+  forecast_private:
+    internal: true
+
+volumes:
+  timesfm_models:
+  forecast_postgres:
