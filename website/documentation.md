@@ -29,10 +29,26 @@ Le script d’initialisation génère le fichier `.env` et les secrets locaux. U
 | `monitoring` | Métriques et tableaux de bord Prometheus et Grafana |
 | `auth` | Identité et authentification avec Keycloak |
 | `actions` | Approbation humaine et action vérifiée sur Autoroutes. Requiert `auth` |
-| `forecast` | Prévisions de métriques avec TimesFM et comparaison avec Timestral de Mistral |
+| `forecast` | [Prévisions avec TimesFM et comparaison avec Timestral](#tester-les-previsions) |
 | `e2e` | Scénario de test avec simulateur et modèle factice |
 
 Les modules s’activent en ajoutant leurs fichiers à `COMPOSE_FILE` dans `.env`. Consultez le [README du dépôt]({{ site.project_repository }}#modules) pour les versions minimales et les ressources de chaque module.
+
+<h2 id="tester-les-previsions">Tester les prévisions</h2>
+
+Ouvrez PowerShell à la racine du dépôt avec Docker Desktop en mode conteneurs Linux et Docker Compose 2.24.4 ou plus. Le lanceur crée une pile de test avec ses propres volumes et secrets. Aucune clé d’API de fournisseur IA n’est nécessaire.
+
+```powershell
+.\scripts\test-forecast.ps1
+.\scripts\test-forecast.ps1 -Mode Complet
+.\scripts\test-forecast.ps1 -Arreter
+```
+
+- En mode **Rapide**, TimesFM et Timestral renvoient chacun dix points pour la même série synthétique.
+- En mode **Complet**, le simulateur alimente Kafka. KafkaExplorer prévoit le débit des événements, le débit des rejets et le taux de rejet. Ouvrez l’URL affichée par le lanceur, puis consultez **Metrics Forecast** pour voir la prévision et la comparaison Timestral.
+- Avec **Arrêt**, les poids et l’historique restent disponibles pour l’essai suivant.
+
+Le premier lancement construit le service et télécharge les poids. Le mode complet ajoute environ 11 minutes de collecte pour réunir 128 points. Consultez le [dépannage dans le README]({{ site.project_repository }}#d%C3%A9panner-le-test) si le démarrage ou la collecte bloque.
 
 <h2 id="scenario">Rejouer le scénario de gare muette</h2>
 
