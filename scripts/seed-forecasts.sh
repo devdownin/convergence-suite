@@ -137,25 +137,32 @@ if ! $wait_forecast || [[ $status -ne 0 ]]; then
 fi
 
 # 3. Une prévision existe quand TimesFM a répondu sur la série : pas avant 128 points d'historique.
+# Toutes les séries sont suivies ensemble, et l'échec les nomme toutes, pas seulement la première.
 deadline=$(( $(date +%s) + wait_timeout ))
-for item in "${approved[@]}"; do
-  IFS='|' read -r id series_id <<<"$item"
-  encoded="$(jq -rn --arg s "$series_id" '$s | @uri')"
-  last=""
-  while :; do
-    view="$(api "$explorer/api/forecasts/$encoded" 2>/dev/null || true)"
+declare -A finished last
+while :; do
+  pending=0
+  for item in "${approved[@]}"; do
+    IFS='|' read -r id series_id <<<"$item"
+    [[ -n "${finished[$id]:-}" ]] && continue
+    view="$(api "$explorer/api/forecasts/$series_id" 2>/dev/null || true)"
     if jq -e '.result.strategy == "TIMESFM" and ((.result.forecast.points // []) | length > 0)' <<<"$view" >/dev/null 2>&1; then
       echo "prévision TimesFM : $id — $(jq -r '"\(.result.forecast.points | length) points, état \(.result.state), modèle \(.result.forecast.modelId)"' <<<"$view")"
-      break
+      finished[$id]=1
+      continue
     fi
-    progress="$(api "$explorer/api/forecasts/$encoded/progress" 2>&1 || true)"
+    pending=$((pending + 1))
+    progress="$(api "$explorer/api/forecasts/$series_id/progress" 2>&1 || true)"
     line="$(jq -r '"\(.state) \(.observedPoints // 0)/\(.requiredPoints) — \(.reason // "")"' <<<"$progress" 2>/dev/null || echo "$progress")"
-    [[ "$line" != "$last" ]] && echo "  $id : $line" && last="$line"
-    if (( $(date +%s) > deadline )); then
-      echo "ÉCHEC : pas de prévision TimesFM pour $id après ${wait_timeout} s — dernier état : $line" >&2
-      jq -c '.result | {state, strategy, reason}' <<<"$view" >&2 2>/dev/null || true
-      exit 1
-    fi
-    sleep 20
+    if [[ "$line" != "${last[$id]:-}" ]]; then echo "  $id : $line"; last[$id]="$line"; fi
   done
+  (( pending == 0 )) && exit 0
+  if (( $(date +%s) > deadline )); then
+    for item in "${approved[@]}"; do
+      IFS='|' read -r id _ <<<"$item"
+      [[ -z "${finished[$id]:-}" ]] && echo "ÉCHEC : pas de prévision TimesFM pour $id après ${wait_timeout} s — ${last[$id]:-aucun état}" >&2
+    done
+    exit 1
+  fi
+  sleep 20
 done
