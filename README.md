@@ -5,11 +5,11 @@
 [![Publication GitHub Pages](https://github.com/devdownin/convergence-suite/actions/workflows/jekyll-gh-pages.yml/badge.svg?branch=main&event=push)](https://github.com/devdownin/convergence-suite/actions/workflows/jekyll-gh-pages.yml)
 [![Licence GPL v3](https://img.shields.io/badge/Licence-GPL_v3-326F5C)](LICENSE)
 
-Une gare de péage cesse d’émettre. Convergence Suite aide à enquêter, à soumettre une action à validation et à vérifier qu’elle a été appliquée. Le scénario de Vienne tourne en local avec Docker Compose et sans clé de fournisseur IA.
+Convergence Suite relie vos flux Kafka à votre activité métier. Explorez les événements, suivez le trafic simulé sur une carte des péages et consultez vos documents avec leurs sources. L’agent rassemble les informations utiles et soumet les actions sensibles à votre validation.
 
-**[Voir la démonstration](https://devdownin.github.io/convergence-suite/#demonstration)** · **[Rejouer le scénario](https://devdownin.github.io/convergence-suite/documentation/#scenario)** · [Lire le test de bout en bout](scripts/e2e.sh)
+**[Découvrir les usages](https://devdownin.github.io/convergence-suite/#applications)** · **[Essayer en local](#démarrage)**
 
-Assemblage de quatre applications en une suite cohérente, à partir de leurs images publiées :
+La suite assemble quatre applications à partir de leurs images publiées.
 
 | Application | Rôle dans la suite | Dépôt |
 | --- | --- | --- |
