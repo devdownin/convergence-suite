@@ -5,7 +5,7 @@
 #   - KafkaExplorer : scripts de démarrage des serveurs llama.cpp de SpectraLLM (pile spectra-hub).
 #
 # Usage : scripts/sync-upstream.sh            (tags par défaut ci-dessous)
-#         AUTOROUTES_REF=v0.5.3 scripts/sync-upstream.sh
+#         AUTOROUTES_REF=v0.5.4 scripts/sync-upstream.sh
 #
 # Le résultat est versionné : la suite démarre sans accès à GitHub. Relancer ce script à chaque
 # changement de version épinglée (docs/versions.md), puis relire le diff avant de committer.

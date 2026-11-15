@@ -1,6 +1,6 @@
 # Exécution gouvernée de la déclaration d'anomalie (tâche 3.4).
 #
-# À n'activer qu'avec Kex-anHarness ≥ 0.13.1 (PR #223) (capacités DECLARE_ANOMALY/CLEAR_ANOMALY) et Autoroutes ≥ 0.5.3
+# À n'activer qu'avec Kex-anHarness ≥ 0.13.2 (PR #223, #225) (capacités DECLARE_ANOMALY/CLEAR_ANOMALY) et Autoroutes ≥ 0.5.4
 # (PR #58, outil etat_gare) : une version plus ancienne de Kex refuse de démarrer sur une capacité inconnue.
 #   COMPOSE_FILE=compose.yaml:compose.docs.yaml:compose.auth.yaml:compose.actions.yaml
 #
