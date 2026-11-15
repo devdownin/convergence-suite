@@ -2,23 +2,23 @@
   role: Observer
   icon: stream
   tone: blue
-  description: "Explorer les flux Kafka, interroger les événements avec Flink SQL et examiner les messages rejetés."
+  description: "Suivre les flux Kafka et interroger vos événements avec Flink SQL."
   url: https://github.com/devdownin/Kafkaexplorer
 - name: Kex-anHarness
   role: Coordonner
   icon: agent
   tone: teal
-  description: "Orchestrer des agents IA et leurs outils MCP, avec validation humaine des actions sensibles dans le module dédié."
+  description: "Coordonner les outils de l’agent et soumettre les actions sensibles à validation avec le module dédié."
   url: https://github.com/devdownin/Kex-anHarness
 - name: SpectraLLM
   role: Comprendre
   icon: docs
   tone: violet
-  description: "Interroger une base documentaire avec un modèle local et retrouver les sources citées dans les réponses."
+  description: "Retrouver des réponses et leurs sources dans vos documents grâce au module documentaire et à un modèle local."
   url: https://github.com/devdownin/SpectraLLM
 - name: Autoroutes
   role: Visualiser
   icon: map
   tone: amber
-  description: "Suivre le trafic simulé sur une carte des péages et repérer les anomalies de la chaîne événementielle."
+  description: "Visualiser le trafic simulé et suivre l’activité des gares sur une carte des péages."
   url: https://github.com/SteelDevAndroid/autoroutes

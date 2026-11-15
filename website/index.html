@@ -1,19 +1,19 @@
 ---
 layout: default
-title: Du flux Kafka à l’action vérifiée
-description: "Rejouez un incident sur Kafka avec Convergence Suite, de la détection à la vérification de l’action approuvée."
+title: Pilotez vos flux Kafka avec le contexte métier
+description: "Explorez les événements Kafka, visualisez leur impact métier, retrouvez les sources utiles et validez les actions proposées par un agent."
 permalink: /
 ---
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-copy">
     <p class="eyebrow"><span></span> Suite open source</p>
-    <h1 id="hero-title">D’un incident Kafka <em>à une action vérifiée.</em></h1>
-    <p class="hero-intro">Une gare de péage cesse d’émettre. L’agent enquête, propose une action à l’opérateur et vérifie son application après approbation.</p>
+    <h1 id="hero-title">Pilotez vos flux Kafka <em>avec le contexte métier.</em></h1>
+    <p class="hero-intro">Explorez vos événements, suivez l’activité sur une carte et retrouvez les documents utiles. Votre équipe garde la main sur les actions que propose l’agent.</p>
     <div class="hero-actions">
-      <a class="button button-primary" href="#demonstration">
-        Voir la démonstration {% include icon.html name="arrow" %}
+      <a class="button button-primary" href="#applications">
+        Découvrir les usages {% include icon.html name="arrow" %}
       </a>
-      <a class="button button-secondary" href="{{ '/documentation/' | relative_url }}#scenario">
+      <a class="button button-secondary" href="{{ '/documentation/' | relative_url }}#démarrage-local">
         Essayer en local {% include icon.html name="arrow" %}
       </a>
     </div>
@@ -44,50 +44,9 @@ permalink: /
   </figure>
 </section>
 
-<section class="demo" id="demonstration" aria-labelledby="demo-title">
-  <div class="section-heading">
-    <h2 id="demo-title">Quand la gare de Vienne cesse d’émettre</h2>
-    <p>Quatre extraits du journal du test de bout en bout montrent le parcours de l’incident jusqu’à sa vérification.</p>
-  </div>
-
-  <ol class="demo-steps">
-    <li class="demo-step">
-      <h3>Détecter la gare muette</h3>
-      <p>L’agent interroge Autoroutes. L’état <code>STALE</code> indique que la gare n’émet plus dans le délai attendu.</p>
-      <pre><samp>cycle 11 : 1 anomalie(s), 1 décision(s)
-ok    cycle 11 : gare GL-BPV-0134 muette détectée</samp></pre>
-    </li>
-    <li class="demo-step">
-      <h3>Attendre l’approbation</h3>
-      <p>L’agent propose une déclaration d’anomalie. La décision reste en attente de validation.</p>
-      <pre><samp>ok    décision 58e78781-c095-4806-80b3-cdcb082d32b8 en attente de validation humaine</samp></pre>
-    </li>
-    <li class="demo-step">
-      <h3>Appliquer la déclaration</h3>
-      <p>Après approbation, Autoroutes renvoie l’identifiant de la gare et l’horodatage de la déclaration.</p>
-      <pre><samp>"stationId": "GL-BPV-0134",
-"stationName": "Vienne",
-"eventTime": "2026-11-15T10:16:41.960708787Z"</samp></pre>
-    </li>
-    <li class="demo-step">
-      <h3>Vérifier le résultat</h3>
-      <p>L’agent relit la version de la gare et la compare à l’horodatage attendu. Leur concordance donne le statut <code>VERIFIED</code>.</p>
-      <pre><samp>ok    déclaration appliquée par Autoroutes et vérifiée par relecture indépendante
-Boucle complète en 118 s.</samp></pre>
-    </li>
-  </ol>
-
-  <p class="demo-note">Le trafic et le jugement du modèle sont simulés. Le script joue le rôle de l’opérateur pour l’approbation. L’enregistrement dans Autoroutes et la relecture passent par les services de la suite.</p>
-  <div class="demo-actions">
-    <a class="button button-primary" href="{{ '/documentation/' | relative_url }}#scenario">Rejouer ce scénario {% include icon.html name="arrow" %}</a>
-    <a class="feature-link" href="{{ site.project_repository }}/actions/runs/43702972938/job/132777968691">Consulter le journal GitHub Actions {% include icon.html name="external" %}</a>
-  </div>
-</section>
-
 <section class="applications" id="applications" aria-labelledby="applications-title">
   <div class="section-heading">
-    <h2 id="applications-title">Quatre applications, une même chaîne opérationnelle</h2>
-    <p>Explorez les flux, croisez les preuves et suivez les événements sur le terrain.</p>
+    <h2 id="applications-title">Quatre applications pour suivre votre activité</h2>
   </div>
   <div class="feature-grid">
     {% for app in site.data.apps %}
@@ -109,6 +68,6 @@ Boucle complète en 118 s.</samp></pre>
   </div>
   <div>
     <p>Convergence Suite est un environnement d’intégration pour architectes logiciels, équipes data et équipes d’exploitation. Docker Compose permet d’évaluer la chaîne sur un broker Kafka partagé et d’ajouter les modules selon les besoins.</p>
-    <a class="feature-link" href="{{ site.project_repository }}">Explorer le dépôt GitHub {% include icon.html name="external" %}</a>
+    <a class="feature-link" id="demonstration" href="{{ '/documentation/' | relative_url }}#scenario">Voir un exemple de bout en bout {% include icon.html name="arrow" %}</a>
   </div>
 </section>

@@ -1,12 +1,12 @@
 ---
 layout: page
 title: Documentation
-description: "Installer Convergence Suite, choisir ses modules et exécuter le scénario de gare muette."
+description: "Installer Convergence Suite, choisir ses modules et essayer un scénario de bout en bout."
 permalink: /documentation/
 ---
 Convergence Suite assemble Kafka, KafkaExplorer, Kex-anHarness et Autoroutes. SpectraLLM s’ajoute avec le module documentaire. Ce guide décrit l’installation locale de la suite.
 
-## Démarrage local
+<h2 id="démarrage-local">Démarrage local</h2>
 
 Prérequis : Docker Engine 25+, Docker Compose 2.20+, Bash, curl et OpenSSL.
 
@@ -67,7 +67,37 @@ Pour arrêter la pile :
 docker compose down
 ```
 
-[Voir les quatre étapes de la démonstration]({{ '/' | relative_url }}#demonstration) · [Lire le script de vérification]({{ site.project_repository }}/blob/{{ site.project_branch }}/scripts/e2e.sh)
+<details class="demo-log">
+  <summary>Voir les quatre étapes dans le journal du test</summary>
+  <ol class="demo-steps">
+    <li class="demo-step">
+      <h3>Détecter la gare muette</h3>
+      <p>L’agent interroge Autoroutes. L’état <code>STALE</code> indique que la gare n’émet plus dans le délai attendu.</p>
+      <pre><samp>cycle 11 : 1 anomalie(s), 1 décision(s)
+ok    cycle 11 : gare GL-BPV-0134 muette détectée</samp></pre>
+    </li>
+    <li class="demo-step">
+      <h3>Attendre l’approbation</h3>
+      <p>L’agent propose une déclaration d’anomalie. La décision reste en attente de validation.</p>
+      <pre><samp>ok    décision 58e78781-c095-4806-80b3-cdcb082d32b8 en attente de validation humaine</samp></pre>
+    </li>
+    <li class="demo-step">
+      <h3>Appliquer la déclaration</h3>
+      <p>Après approbation, Autoroutes renvoie l’identifiant de la gare et l’horodatage de la déclaration.</p>
+      <pre><samp>"stationId": "GL-BPV-0134",
+"stationName": "Vienne",
+"eventTime": "2026-11-15T10:16:41.960708787Z"</samp></pre>
+    </li>
+    <li class="demo-step">
+      <h3>Vérifier le résultat</h3>
+      <p>L’agent relit la version de la gare et la compare à l’horodatage attendu. Leur concordance donne le statut <code>VERIFIED</code>.</p>
+      <pre><samp>ok    déclaration appliquée par Autoroutes et vérifiée par relecture indépendante
+Boucle complète en 118 s.</samp></pre>
+    </li>
+  </ol>
+</details>
+
+[Lire le script de vérification]({{ site.project_repository }}/blob/{{ site.project_branch }}/scripts/e2e.sh)
 
 ## Références
 
