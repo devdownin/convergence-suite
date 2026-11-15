@@ -75,7 +75,7 @@ COMPOSE_FILE=compose.yaml:compose.forecast.yaml
 docker compose up -d && scripts/seed-forecasts.sh --wait
 ```
 
-Le script crée deux métriques dans KafkaExplorer — débit de `toll-events` et rejets rapportés aux événements —, approuve leurs séries, puis attend la première prévision TimesFM. Elle arrive après 128 points d'historique : un peu plus d'une heure au pas proposé de 30 s. La console d'Explorer les montre dans « Metrics Forecast », et l'agent les lit par les outils MCP de prévision. Les entrées/sorties par gare restent hors du script : elles demandent du SQL sur le contenu des messages, que le pilote de prévision n'accepte pas. La CI fait tourner le banc chaque semaine et sur toute PR qui le touche (workflow `Prévisions`, profil accéléré à 11 min d'historique).
+Le script crée deux métriques dans KafkaExplorer — débit de `toll-events` et débit des rejets —, approuve leurs séries, puis attend la première prévision TimesFM. Elle arrive après 128 points d'historique : un peu plus d'une heure au pas proposé de 30 s. La console d'Explorer les montre dans « Metrics Forecast », et l'agent les lit par les outils MCP de prévision. Les entrées/sorties par gare restent hors du script : elles demandent du SQL sur le contenu des messages, que le pilote de prévision n'accepte pas. La CI fait tourner le banc chaque semaine et sur toute PR qui le touche (workflow `Prévisions`, profil accéléré à 11 min d'historique).
 
 ## Sécurité — à lire avant tout partage
 
@@ -122,7 +122,7 @@ docs/verifications-phase-0.md  points vérifiés dans le code des quatre dépôt
 | 0 — Cadrage | ADR, matrice de versions, six points vérifiés | Livrée |
 | 1 — Assemblage | Compose à modules, broker unique, proxy TLS, test de fumée en CI | Livrée, à valider en CI |
 | 2 — Agent unifié et gouvernance | Jetons renouvelés et `harness_*` (code Kex, PR #222), client `kex-supervisor`, caller SpectraLLM, processus et compétences | Livrée ; MCP d'Autoroutes sous jeton avec le module `auth` (Kex `0.13.0`) |
-| 3 — Boucle opérationnelle | Métriques péage, prévisions, DLQ, action vérifiée | Code fusionné : 3.2 (Autoroutes #59), 3.3 (Autoroutes #58), 3.4 (Kex #223) ; publiés dans Kex `0.13.1` et Autoroutes `0.5.3`, puis complétés par Kex `0.13.2` et Autoroutes `0.5.4` ; boucle complète prouvée en CI par `scripts/e2e.sh`, après trois correctifs qu'elle a révélés (Kex #225, Autoroutes #61) ; 3.1 : module `forecast` et `scripts/seed-forecasts.sh --wait`, vérifiés par le workflow `Prévisions` jusqu'à la prévision TimesFM (débit et rejets ; entrées/sorties par gare hors pilote, faute de gabarit éligible) |
+| 3 — Boucle opérationnelle | Métriques péage, prévisions, DLQ, action vérifiée | Code fusionné : 3.2 (Autoroutes #59), 3.3 (Autoroutes #58), 3.4 (Kex #223) ; publiés dans Kex `0.13.1` et Autoroutes `0.5.3`, puis complétés par Kex `0.13.2` et Autoroutes `0.5.4` ; boucle complète prouvée en CI par `scripts/e2e.sh`, après trois correctifs qu'elle a révélés (Kex #225, Autoroutes #61) ; 3.1 : module `forecast` et `scripts/seed-forecasts.sh --wait`, vérifiés par le workflow `Prévisions` jusqu'à la prévision TimesFM (débit des événements et des rejets ; entrées/sorties par gare hors pilote, faute de gabarit éligible) |
 | 4 — Connaissance et IA locale | Ingestion des specs et audits, DPO, fine-tuning | À venir |
 | 5 — Industrialisation | MCP communs, monitoring complet, SSO, liens profonds | À venir |
 

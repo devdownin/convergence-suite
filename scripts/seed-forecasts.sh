@@ -6,7 +6,9 @@
 #
 # Ce que ce script mesure — et ce qu'il ne mesure pas :
 #   - débit du topic toll-events (offsets produits, prévus comme un taux) ;
-#   - rejets rapportés aux événements (offsets du topic de rejets / offsets de toll-events).
+#   - débit des rejets (même mesure sur le topic de rejets) : le taux de rejet se lit du rapport des
+#     deux. Un rapport calculé par Explorer (TOPIC_COUNT_DELTA) n'est pas prévisible en 2.4.x :
+#     l'historique marque chacun de ses points « portée limitée ».
 # Les entrées/sorties par gare et le taux d'ANOMALY_REPORT demandent du SQL Flink sur le contenu des
 # messages : le gabarit SQL brut n'est pas éligible à la prévision (portée non vérifiable), donc ils
 # restent hors de ce script.
@@ -63,7 +65,7 @@ fi
 # id | nom (format Prometheus, exigé par Explorer) | description | paramètres du gabarit (JSON) | gabarit
 metrics=(
   "peage-evenements-produits|peage_evenements_produits|Péage : offsets produits sur toll-events|{\"measurement\":\"PRODUCED_OFFSETS\",\"topic\":\"toll-events\"}|KAFKA_CLUSTER_COUNT"
-  "peage-taux-rejets|peage_taux_rejets|Péage : offsets de ${rejected_topic} rapportés à ceux de toll-events|{\"leftTopic\":\"${rejected_topic}\",\"rightTopic\":\"toll-events\",\"countBy\":\"OFFSETS\",\"operation\":\"RATIO\"}|TOPIC_COUNT_DELTA"
+  "peage-rejets-produits|peage_rejets_produits|Péage : offsets produits sur ${rejected_topic}|{\"measurement\":\"PRODUCED_OFFSETS\",\"topic\":\"${rejected_topic}\"}|KAFKA_CLUSTER_COUNT"
 )
 ids=()
 
