@@ -1,0 +1,75 @@
+---
+layout: default
+title: Kafka, agents IA et supervision métier
+description: "Convergence Suite réunit KafkaExplorer, Kex-anHarness, SpectraLLM et Autoroutes dans un environnement Docker Compose."
+permalink: /
+---
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-copy">
+    <p class="eyebrow"><span></span> Suite open source</p>
+    <h1 id="hero-title">De l’événement<br class="hero-break"> <em>à la décision.</em></h1>
+    <p class="hero-intro">Convergence Suite réunit Kafka, agents IA, recherche documentaire et supervision métier pour enquêter sur vos flux et agir avec validation humaine.</p>
+    <div class="hero-actions">
+      <a class="button button-primary" href="{{ site.project_repository }}">
+        {% include icon.html name="github" %} Explorer sur GitHub
+      </a>
+      <a class="button button-secondary" href="{{ '/documentation/' | relative_url }}">
+        Documentation {% include icon.html name="arrow" %}
+      </a>
+    </div>
+  </div>
+  <figure class="architecture" aria-labelledby="map-title">
+    <figcaption id="map-title"><span class="map-status"></span> Architecture de la suite</figcaption>
+    <div class="architecture-flow">
+      <div class="flow-node flow-agent">
+        <span class="module-icon tone-teal">{% include icon.html name="agent" %}</span>
+        <span><strong>Kex-anHarness</strong><small>Agent et validation</small></span>
+      </div>
+      <div class="flow-connection"><span>Outils MCP</span></div>
+      <div class="flow-branches">
+        <div class="flow-node">
+          <span class="module-icon tone-blue">{% include icon.html name="stream" %}</span>
+          <span><strong>KafkaExplorer</strong><small>Flux Kafka</small></span>
+        </div>
+        <div class="flow-node">
+          <span class="module-icon tone-violet">{% include icon.html name="docs" %}</span>
+          <span><strong>SpectraLLM</strong><small>Module documentaire</small></span>
+        </div>
+        <div class="flow-node">
+          <span class="module-icon tone-amber">{% include icon.html name="map" %}</span>
+          <span><strong>Autoroutes</strong><small>Carte des péages</small></span>
+        </div>
+      </div>
+    </div>
+  </figure>
+</section>
+
+<section class="applications" id="applications" aria-labelledby="applications-title">
+  <div class="section-heading">
+    <h2 id="applications-title">Quatre applications, une même chaîne opérationnelle</h2>
+    <p>Explorez les flux, croisez les preuves et suivez les événements sur le terrain.</p>
+  </div>
+  <div class="feature-grid">
+    {% for app in site.data.apps %}
+    <article class="feature-card">
+      <span class="module-icon tone-{{ app.tone }}">{% include icon.html name=app.icon %}</span>
+      <p class="feature-role">{{ app.role }}</p>
+      <h3>{{ app.name }}</h3>
+      <p class="feature-description">{{ app.description }}</p>
+      <a class="feature-link" href="{{ app.url }}" aria-label="Dépôt GitHub de {{ app.name }}">Voir le dépôt {% include icon.html name="external" %}</a>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="vision" id="vision" aria-labelledby="vision-title">
+  <div>
+    <p class="eyebrow">À propos du projet</p>
+    <h2 id="vision-title">Des décisions que l’on peut vérifier</h2>
+  </div>
+  <div>
+    <p>Convergence Suite est un environnement d’intégration pour architectes logiciels, équipes data et équipes d’exploitation. Docker Compose permet d’évaluer la chaîne sur un broker Kafka partagé et d’ajouter les modules selon les besoins.</p>
+    <p>Le scénario de péage simule une gare qui cesse d’émettre. L’agent consulte son état, propose une déclaration d’anomalie à un opérateur et vérifie son application après approbation.</p>
+    <a class="feature-link" href="{{ '/documentation/' | relative_url }}#scenario">Découvrir le scénario {% include icon.html name="arrow" %}</a>
+  </div>
+</section>

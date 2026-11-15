@@ -1,0 +1,15 @@
+<svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  {% case include.name %}
+    {% when "logo" %}<path d="M3 5h3a4 4 0 0 1 4 4v3m-7 7h3a4 4 0 0 0 4-4v-3m0 0h11M3 12h7"/><circle cx="17" cy="12" r="2.3" fill="currentColor" stroke="none"/>
+    {% when "home" %}<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/>
+    {% when "grid" %}<rect x="3" y="3" width="7" height="7" rx="1.25"/><rect x="14" y="3" width="7" height="7" rx="1.25"/><rect x="3" y="14" width="7" height="7" rx="1.25"/><rect x="14" y="14" width="7" height="7" rx="1.25"/>
+    {% when "compass" %}<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>
+    {% when "docs" %}<path d="M4 5a2 2 0 0 1 2-2h13v17H6a2 2 0 0 1-2-2zm0 13a2 2 0 0 1 2-2h13M8 7h7m-7 4h5"/>
+    {% when "external" %}<path d="M13 4h7v7m0-7L10 14m9-1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/>
+    {% when "arrow" %}<path d="M4 12h15m-6-6 6 6-6 6"/>
+    {% when "stream" %}<path d="M3 6h7l2 3h9M3 12h5m-5 6h7l2-3h9m-3-9 3 3-3 3m0 0 3 3-3 3"/>
+    {% when "agent" %}<rect x="6" y="6" width="12" height="12" rx="3"/><circle cx="12" cy="12" r="2"/><path d="M9 3v3m6-3v3m-6 12v3m6-3v3M3 9h3m-3 6h3m12-6h3m-3 6h3"/>
+    {% when "map" %}<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2zm6-2v16m6-14v16"/>
+    {% when "github" %}<path fill="currentColor" stroke="none" d="M12 .9A11.1 11.1 0 0 0 8.5 22.5c.55.1.75-.24.75-.53v-2.07c-3.05.66-3.7-1.29-3.7-1.29-.5-1.27-1.22-1.61-1.22-1.61-1-.68.08-.67.08-.67 1.1.08 1.67 1.13 1.67 1.13.98 1.67 2.56 1.19 3.18.91.1-.7.38-1.19.7-1.47-2.43-.27-4.99-1.21-4.99-5.42 0-1.2.43-2.18 1.12-2.95-.11-.28-.49-1.4.11-2.91 0 0 .92-.29 3.05 1.13a10.5 10.5 0 0 1 5.55 0c2.13-1.42 3.04-1.13 3.04-1.13.61 1.51.23 2.63.12 2.91.7.77 1.12 1.75 1.12 2.95 0 4.22-2.57 5.14-5.02 5.41.39.35.75 1.02.75 2.05v3.03c0 .29.2.63.76.53A11.1 11.1 0 0 0 12 .9Z"/>
+  {% endcase %}
+</svg>

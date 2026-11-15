@@ -1,0 +1,16 @@
+<aside class="sidebar">
+  <nav class="sidebar-nav" aria-label="Navigation principale">
+    <a href="{{ '/' | relative_url }}"{% if page.url == "/" %} aria-current="page"{% endif %}>
+      {% include icon.html name="home" %} <span>Accueil</span>
+    </a>
+    <a href="{{ '/' | relative_url }}#applications">
+      {% include icon.html name="grid" %} <span>Applications</span>
+    </a>
+    <a href="{{ '/' | relative_url }}#vision">
+      {% include icon.html name="compass" %} <span>Vision</span>
+    </a>
+    <a href="{{ '/documentation/' | relative_url }}"{% if page.url == "/documentation/" %} aria-current="page"{% endif %}>
+      {% include icon.html name="docs" %} <span>Documentation</span>
+    </a>
+  </nav>
+</aside>
