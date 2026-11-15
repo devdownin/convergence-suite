@@ -1,6 +1,6 @@
 # Module « docs » — SpectraLLM : mémoire documentaire, RAG cité et inférence locale.
 # Surcouche de compose.yaml. Services repris de compose/spectra-hub.yml et spectra-hub.mcp.yml
-# de KafkaExplorer (v2.4.1), la seule pile SpectraLLM que sa CI démarre de bout en bout.
+# de KafkaExplorer, avec le moteur vectoriel de SpectraLLM 0.2.0.
 #
 #   COMPOSE_FILE=compose.yaml:compose.docs.yaml   (dans .env)
 #
@@ -54,23 +54,21 @@ services:
   # Règle la propriété du volume avant tout autre montage : les images llama.cpp n'ont pas de
   # /app/data, et un volume initialisé par elles serait vide et en root.
   spectra-data-init:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm:${SPECTRA_IMAGE_TAG:-0.12.3}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm:${SPECTRA_IMAGE_TAG:-0.2.0}
     user: root
     volumes:
       - spectra_data:/app/data
     entrypoint: ["sh", "-c", "mkdir -p /app/data/models && chown -R spectra:spectra /app/data"]
 
-  # Base vectorielle de SpectraLLM 0.12.3. Qdrant n'arrive qu'avec la version suivante
-  # (docs/versions.md). Non publiée : lecture ET écriture sur le corpus.
-  chromadb:
-    image: chromadb/chroma:${CHROMADB_IMAGE_TAG:-1.5.9}
+  # Index vectoriel privé de SpectraLLM.
+  qdrant:
+    image: qdrant/qdrant:${QDRANT_IMAGE_TAG:-v1.20.1}
     volumes:
-      - spectra_chroma:/data
+      - spectra_qdrant:/qdrant/storage
     environment:
-      ANONYMIZED_TELEMETRY: "FALSE"
-      CHROMA_OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      QDRANT__TELEMETRY_DISABLED: "true"
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8000 && echo -e 'GET /api/v2/heartbeat HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      test: ["CMD", "bash", "-ec", "exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /readyz HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
       interval: 20s
       timeout: 5s
       retries: 3
@@ -79,13 +77,13 @@ services:
     restart: unless-stopped
 
   spectra-api:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm:${SPECTRA_IMAGE_TAG:-0.12.3}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm:${SPECTRA_IMAGE_TAG:-0.2.0}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${SPECTRA_API_PORT:-8089}:8080"
     depends_on:
       spectra-data-init:
         condition: service_completed_successfully
-      chromadb:
+      qdrant:
         condition: service_healthy
     environment:
       # Sans limite de conteneur, MaxRAMPercentage lirait la mémoire de l'hôte.
@@ -93,7 +91,7 @@ services:
       SPECTRA_LLM_PROVIDER: llama-cpp
       SPECTRA_LLM_CHAT_BASE_URL: http://llm-chat:8081
       SPECTRA_LLM_EMBEDDING_BASE_URL: http://llm-embed:8082
-      SPECTRA_CHROMADB_BASE_URL: http://chromadb:8000
+      SPECTRA_QDRANT_BASE_URL: http://qdrant:6333
       SPECTRA_LLM_MODEL: ${LLM_CHAT_MODEL_NAME:-qwen2.5-7b-instruct}
       SPECTRA_LLM_CHAT_FILE: ${LLM_CHAT_MODEL_FILE:-Qwen2.5-7B-Instruct-Q4_K_M.gguf}
       SPECTRA_LLM_EMBEDDING_MODEL: ${LLM_EMBED_MODEL_NAME:-nomic-embed-text}
@@ -125,7 +123,7 @@ services:
 
   # llama.cpp — chat. Non publié : llama-server n'a pas d'authentification.
   llm-chat:
-    image: ghcr.io/ggml-org/llama.cpp:${LLAMA_CPP_IMAGE_TAG:-server-b9828}
+    image: ghcr.io/ggml-org/llama.cpp:${LLAMA_CPP_IMAGE_TAG:-server@sha256:89fe93c2ef53ea2d09ca9f53db8878a8f57bb6b143eb63c76a9c218fb583b392}
     depends_on:
       spectra-data-init:
         condition: service_completed_successfully
@@ -152,7 +150,7 @@ services:
 
   # llama.cpp — embeddings. Un processus par rôle : l'ingestion ne prend pas les slots du chat.
   llm-embed:
-    image: ghcr.io/ggml-org/llama.cpp:${LLAMA_CPP_IMAGE_TAG:-server-b9828}
+    image: ghcr.io/ggml-org/llama.cpp:${LLAMA_CPP_IMAGE_TAG:-server@sha256:89fe93c2ef53ea2d09ca9f53db8878a8f57bb6b143eb63c76a9c218fb583b392}
     depends_on:
       spectra-data-init:
         condition: service_completed_successfully
@@ -176,7 +174,7 @@ services:
   # Télécharge le modèle d'embeddings (~81 Mo), que spectra-api n'installe pas lui-même, et le
   # modèle de chat seulement si SPECTRA_CHAT_MODEL_URL est renseignée.
   spectra-models:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm:${SPECTRA_IMAGE_TAG:-0.12.3}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm:${SPECTRA_IMAGE_TAG:-0.2.0}
     depends_on:
       spectra-data-init:
         condition: service_completed_successfully
@@ -195,7 +193,7 @@ services:
   # nginx de l'interface ; son amont /api/ → spectra-api:8080 est figé dans l'image, d'où le
   # nom de service spectra-api à conserver.
   spectra-ui:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm-frontend:${SPECTRA_IMAGE_TAG:-0.12.3}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/spectrallm-frontend:${SPECTRA_IMAGE_TAG:-0.2.0}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${SPECTRA_UI_PORT:-8088}:80"
     depends_on:
@@ -213,4 +211,4 @@ services:
 volumes:
   # Documents, base H2, modèles GGUF, jobs de fine-tuning. `down -v` efface les 4,8 Go de poids.
   spectra_data:
-  spectra_chroma:
+  spectra_qdrant:

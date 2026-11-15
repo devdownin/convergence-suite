@@ -1,18 +1,19 @@
-# Module forecast — prévisions TimesFM de KafkaExplorer (tâche 3.1).
+# Module forecast — prévisions TimesFM et comparaison locale avec Timestral-28M.
 #
 # Historique des métriques dans PostgreSQL, inférence TimesFM sur CPU, approbation à chaud depuis la
 # console (« Metrics » → « Prepare a forecast ») ou par scripts/seed-forecasts.sh.
 #
 # TimesFM n'a pas d'image publiée : il se construit depuis les sources de KafkaExplorer, au tag qui
 # correspond à l'image d'Explorer, pour que client et service parlent le même contrat. Le premier
-# démarrage télécharge le modèle épinglé (vérifié par SHA-256) dans le volume timesfm_models.
+# démarrage télécharge les poids épinglés (vérifiés par SHA-256) dans le volume timesfm_models.
+# Poids Timestral sous licence Modified MIT : https://huggingface.co/mistralai/Timestral-28M/blob/main/LICENSE
 # Ressources : 4 CPU et 8 Gio par défaut (TIMESFM_CPUS, TIMESFM_MEM_LIMIT).
 #
 # Seul forecast-model-prefetch sort sur Internet ; PostgreSQL et le service d'inférence restent sur un
 # réseau interne, sans port publié.
 services:
   forecast-postgres:
-    image: postgres:17.6-alpine
+    image: postgres:17.12-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: forecasts
@@ -29,36 +30,37 @@ services:
       - forecast_private
 
   forecast-model-prefetch:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-0.3.0}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-2.5.0}
     build:
-      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-0.3.0}:services/timesfm
+      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-2.5.0}:services/timesfm
     restart: "no"
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=512m
-    environment:
+    environment: &forecast-model-env
       TIMESFM_TOKEN: ${TIMESFM_TOKEN:?requis, scripts/init-env.sh le génère}
       TIMESFM_CACHE_DIR: /models
       HF_HOME: /models
+      TIMESTRAL_REVISION: ${TIMESTRAL_REVISION-49b26409ac87b5935539a5d8ffe7f397b720db47}
+      TIMESTRAL_SHA256: ${TIMESTRAL_SHA256-dfc83c6220937ce5fc6687b35a4df94cd25e28a2cfe6fb92a23dad6301b2015d}
     volumes:
       - timesfm_models:/models
     command: ["exec /app/.venv/bin/python -m kex_timesfm.prefetch"]
 
   timesfm:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-0.3.0}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-2.5.0}
     # Même build que forecast-model-prefetch, servi par le cache : sans lui, Compose tenterait de
     # tirer une image qui n'est publiée nulle part.
     build:
-      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-0.3.0}:services/timesfm
+      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-2.5.0}:services/timesfm
     restart: unless-stopped
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=512m
     environment:
-      TIMESFM_TOKEN: ${TIMESFM_TOKEN:?requis, scripts/init-env.sh le génère}
-      TIMESFM_CACHE_DIR: /models
-      HF_HOME: /models
+      <<: *forecast-model-env
       TIMESFM_THREADS: ${TIMESFM_THREADS:-4}
+      TIMESTRAL_THREADS: ${TIMESTRAL_THREADS:-1}
     volumes:
       - timesfm_models:/models
     command: ["exec /app/.venv/bin/uvicorn kex_timesfm.app:application --factory --host 0.0.0.0 --port 8000"]
@@ -87,6 +89,8 @@ services:
       EXPLORER_FORECASTING_INFERENCE_SERVICE_URL: http://timesfm:8000
       EXPLORER_FORECASTING_INFERENCE_TOKEN: ${TIMESFM_TOKEN}
       EXPLORER_FORECASTING_INFERENCE_TIMEOUT: ${TIMESFM_TIMEOUT:-35s}
+      EXPLORER_FORECASTING_INFERENCE_SHADOW_ENABLED: ${TIMESTRAL_SHADOW_ENABLED:-true}
+      EXPLORER_FORECASTING_INFERENCE_SHADOW_TIMEOUT: ${TIMESTRAL_TIMEOUT:-15s}
       EXPLORER_FORECASTING_HISTORY_ENABLED: "true"
       EXPLORER_FORECASTING_HISTORY_JDBC_URL: jdbc:postgresql://forecast-postgres:5432/forecasts
       EXPLORER_FORECASTING_HISTORY_USERNAME: forecasts

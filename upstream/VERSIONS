@@ -1,4 +1,4 @@
 # Fichiers repris des dépôts sources par scripts/sync-upstream.sh. Ne pas modifier à la main.
 # projet tag commit
-autoroutes v0.5.2 76fefff17237cddd2787d70746c87656d29042fc
-kafkaexplorer v0.3.0 933ea320272c3396ccb42a08fc8a5345c199395e
+autoroutes v0.6.0 60168f664bd0a3de105cfa830b0b92abab1af17c
+kafkaexplorer v2.5.0 323de2e5817bb09a4cb685ba680cd7f351a7a075

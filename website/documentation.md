@@ -29,7 +29,7 @@ Le script d’initialisation génère le fichier `.env` et les secrets locaux. U
 | `monitoring` | Métriques et tableaux de bord Prometheus et Grafana |
 | `auth` | Identité et authentification avec Keycloak |
 | `actions` | Approbation humaine et action vérifiée sur Autoroutes. Requiert `auth` |
-| `forecast` | Prévisions de métriques avec TimesFM |
+| `forecast` | Prévisions de métriques avec TimesFM et comparaison avec Timestral de Mistral |
 | `e2e` | Scénario de test avec simulateur et modèle factice |
 
 Les modules s’activent en ajoutant leurs fichiers à `COMPOSE_FILE` dans `.env`. Consultez le [README du dépôt]({{ site.project_repository }}#modules) pour les versions minimales et les ressources de chaque module.

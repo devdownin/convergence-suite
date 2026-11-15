@@ -58,7 +58,7 @@ Le cœur (`compose.yaml`) démarre Kafka, KafkaExplorer, Kex-anHarness, Autorout
 | `monitoring` | `compose.monitoring.yaml` | Prometheus, Alertmanager, Grafana d'Autoroutes, étendus à KafkaExplorer et SpectraLLM | ~1 Go |
 | `auth` | `compose.auth.yaml` | Keycloak, royaume `supervision` d'Autoroutes | ~1 Go |
 | `actions` | `compose.actions.yaml` | Déclaration d'anomalie gouvernée : proposition du modèle, validation humaine, relecture par `etat_gare`. Exige `auth`, Kex ≥ `0.13.2` et Autoroutes ≥ `0.5.4` | négligeable |
-| `forecast` | `compose.forecast.yaml` | Prévisions TimesFM de KafkaExplorer : historique PostgreSQL, inférence CPU construite depuis les sources d'Explorer au tag épinglé, approbation à chaud. Exige KafkaExplorer ≥ `0.3.0` (publiée après `2.4.1`) : sous `2.4.1`, aucune série d'offsets produits ne reçoit de prévision | 4 CPU, ~8 Go de RAM ; build et modèle au premier démarrage |
+| `forecast` | `compose.forecast.yaml` | Historique PostgreSQL, prévisions TimesFM et comparaison avec Timestral‑28M de Mistral. Exige KafkaExplorer `2.5.0` ou une version compatible. | 4 CPU, ~8 Go de RAM ; compilation du service et téléchargement des modèles au premier démarrage |
 | `e2e` | `compose.e2e.yaml` | Jeu d'essai de la boucle complète : gare muette au simulateur, modèle factice scripté, seuil de silence court. Exige `auth` et `actions`. Pour `scripts/e2e.sh`, pas pour un usage réel | négligeable |
 
 ```bash
@@ -82,14 +82,21 @@ Le simulateur fait taire Vienne (`GL-BPV-0134`) après 2 minutes. L'agent lance 
 
 Pourquoi des surcouches et non des profils : un module doit aussi modifier des services du cœur (le module `docs` ajoute une connexion MCP à l'agent), ce qu'un profil Compose ne sait pas faire.
 
-### Prévoir le trafic de péage
+### Prévoir le trafic de péage avec Timestral
+
+Dans `.env`, activer le module avec `COMPOSE_FILE=compose.yaml:compose.forecast.yaml` (sous Windows, utiliser le séparateur documenté dans `.env.example`). Pour une installation existante, mettre aussi à jour les tags définis dans `.env` d'après `.env.example` et lancer `scripts/init-env.sh` pour compléter les secrets.
+
+Les [poids Timestral‑28M](https://huggingface.co/mistralai/Timestral-28M/blob/main/LICENSE) sont distribués sous licence Modified MIT. Pour utiliser TimesFM seul, renseigner dans `.env` les trois réglages de désactivation de Timestral indiqués dans `.env.example`.
 
 ```bash
-COMPOSE_FILE=compose.yaml:compose.forecast.yaml
-docker compose up -d && scripts/seed-forecasts.sh --wait
+docker compose pull --ignore-buildable
+docker compose up -d --build
+scripts/seed-forecasts.sh --wait
 ```
 
-Le script crée deux métriques dans KafkaExplorer — débit de `toll-events` et débit des rejets —, approuve leurs séries, puis attend la première prévision TimesFM. Elle arrive après 128 points d'historique : un peu plus d'une heure au pas proposé de 30 s. La console d'Explorer les montre dans « Metrics Forecast », et l'agent les lit par les outils MCP de prévision. Les entrées/sorties par gare restent hors du script : elles demandent du SQL sur le contenu des messages, que le pilote de prévision n'accepte pas. La CI fait tourner le banc chaque semaine et sur toute PR qui le touche (workflow `Prévisions`, profil accéléré à 11 min d'historique).
+Le script crée et approuve trois séries de péage, le débit de `toll-events`, le débit des rejets et leur ratio. Il attend 128 points d’historique avant la première prévision, soit environ une heure à 30 s par point. Dans « Metrics Forecast », KafkaExplorer affiche les prévisions principales de TimesFM et évalue Timestral sur les mêmes séries dans le volet de comparaison. Le workflow `Prévisions` vérifie que les deux modèles répondent sur chaque série.
+
+Pour une pile `docs` existante, SpectraLLM 0.2.0 ouvre un index Qdrant dans un volume dédié. Les volumes ChromaDB existants exigent un [transfert d’index](https://github.com/devdownin/SpectraLLM/blob/v0.2.0/docs/tech/qdrant-pilot.fr.md). Conserver le volume ChromaDB jusqu’à la vérification du nouvel index.
 
 ## Sécurité — à lire avant tout partage
 
@@ -118,7 +125,7 @@ scripts/init-env.sh          crée .env et génère les secrets
 scripts/smoke.sh             test de fumée (santé, catalogues MCP, unicité des noms d'outils)
 scripts/e2e.sh               boucle complète : gare muette → décision → approbation → action → vérification
 e2e/fake-llm.py              modèle factice compatible OpenAI, scripté, pour le module e2e
-scripts/seed-forecasts.sh    métriques de péage, approbation des séries, attente de la prévision TimesFM
+scripts/seed-forecasts.sh    métriques de péage, approbation des séries, attente des prévisions TimesFM et Timestral
 scripts/seed-kex.sh          propose puis approuve les trois compétences de kex/skills
 scripts/build-realm.py       génère auth/realm-supervision.json (royaume Autoroutes + client kex-supervisor)
 kex/skills/                  procédures de l'agent : triage DLQ, carte figée, anomalie de gare

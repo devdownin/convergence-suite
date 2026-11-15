@@ -29,7 +29,7 @@ Autoroutes se déplace. Les trois autres gardent le plan déjà partagé.
 | Kafka depuis l'hôte | 9092 | `KAFKA_HOST_PORT` |
 | Reverse proxy TLS | 8443 | `PROXY_HTTPS_PORT` |
 
-Tous les ports sont liés à `127.0.0.1` par défaut (`BIND_ADDR`). Les services internes (PostgreSQL, ChromaDB, serveurs llama.cpp) ne sont pas publiés.
+Tous les ports sont liés à `127.0.0.1` par défaut (`BIND_ADDR`). Les services internes (PostgreSQL, Qdrant, serveurs llama.cpp) ne sont pas publiés.
 
 ## Conséquences
 

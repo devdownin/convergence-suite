@@ -5,16 +5,16 @@
 #   - KafkaExplorer : scripts de démarrage des serveurs llama.cpp de SpectraLLM (pile spectra-hub).
 #
 # Usage : scripts/sync-upstream.sh            (tags par défaut ci-dessous)
-#         AUTOROUTES_REF=v0.5.4 scripts/sync-upstream.sh
+#         AUTOROUTES_REF=v0.6.0 scripts/sync-upstream.sh
 #
 # Le résultat est versionné : la suite démarre sans accès à GitHub. Relancer ce script à chaque
 # changement de version épinglée (docs/versions.md), puis relire le diff avant de committer.
 set -euo pipefail
 
 AUTOROUTES_REPO="${AUTOROUTES_REPO:-https://github.com/SteelDevAndroid/autoroutes}"
-AUTOROUTES_REF="${AUTOROUTES_REF:-v0.5.2}"
+AUTOROUTES_REF="${AUTOROUTES_REF:-v0.6.0}"
 EXPLORER_REPO="${EXPLORER_REPO:-https://github.com/devdownin/Kafkaexplorer}"
-EXPLORER_REF="${EXPLORER_REF:-v0.3.0}"
+EXPLORER_REF="${EXPLORER_REF:-v2.5.0}"
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 dest="$root/upstream"

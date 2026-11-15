@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Crée les métriques de péage dans KafkaExplorer puis approuve leurs séries pour TimesFM (tâche 3.1).
+# Crée les métriques de péage dans KafkaExplorer puis approuve leurs séries pour TimesFM et Timestral (tâche 3.1).
 #
 # Prérequis : module forecast (compose.forecast.yaml). Sans lui, la préparation le dit et le script
 # s'arrête avant d'écrire quoi que ce soit.
@@ -14,7 +14,7 @@
 # restent hors de ce script.
 #
 # Usage : scripts/seed-forecasts.sh          crée et approuve, puis rend la main
-#         scripts/seed-forecasts.sh --wait   attend en plus une prévision TimesFM sur chaque série
+#         scripts/seed-forecasts.sh --wait   attend TimesFM et, si activé, Timestral sur chaque série
 #
 # Relançable : une métrique ou une série déjà présente est gardée telle quelle.
 set -euo pipefail
@@ -34,6 +34,7 @@ environment="${FORECAST_ENVIRONMENT:-local}"
 rejected_topic="${REJECTED_TOPIC:-toll-events.rejected}"
 horizon="${FORECAST_HORIZON:-10}"
 wait_timeout="${FORECAST_WAIT_TIMEOUT:-3600}"
+shadow_enabled="${TIMESTRAL_SHADOW_ENABLED:-true}"
 
 # Une réponse en erreur est recopiée sur stderr : Explorer y dit pourquoi il refuse.
 api() {
@@ -142,28 +143,43 @@ fi
 # 3. Une prévision existe quand TimesFM a répondu sur la série : pas avant 128 points d'historique.
 # Toutes les séries sont suivies ensemble, et l'échec les nomme toutes, pas seulement la première.
 deadline=$(( $(date +%s) + wait_timeout ))
-declare -A finished last
+declare -A primary_ready finished last
 while :; do
   pending=0
   for item in "${approved[@]}"; do
     IFS='|' read -r id series_id <<<"$item"
     [[ -n "${finished[$id]:-}" ]] && continue
-    view="$(api "$explorer/api/forecasts/$series_id" 2>/dev/null || true)"
-    if jq -e '.result.strategy == "TIMESFM" and ((.result.forecast.points // []) | length > 0)' <<<"$view" >/dev/null 2>&1; then
-      echo "prévision TimesFM : $id — $(jq -r '"\(.result.forecast.points | length) points, état \(.result.state), modèle \(.result.forecast.modelId)"' <<<"$view")"
+    if [[ -z "${primary_ready[$id]:-}" ]]; then
+      view="$(api "$explorer/api/forecasts/$series_id" 2>/dev/null || true)"
+      if jq -e '.result.strategy == "TIMESFM" and ((.result.forecast.points // []) | length > 0)' <<<"$view" >/dev/null 2>&1; then
+        echo "prévision TimesFM : $id — $(jq -r '"\(.result.forecast.points | length) points, état \(.result.state), modèle \(.result.forecast.modelId)"' <<<"$view")"
+        primary_ready[$id]=1
+      fi
+    fi
+    if [[ -z "${primary_ready[$id]:-}" ]]; then
+      progress="$(api "$explorer/api/forecasts/$series_id/progress" 2>&1 || true)"
+      line="$(jq -r '"\(.state) \(.observedPoints // 0)/\(.requiredPoints) — \(.reason // "")"' <<<"$progress" 2>/dev/null || echo "$progress")"
+    elif [[ "${shadow_enabled,,}" == "true" ]]; then
+      shadow="$(api "$explorer/api/forecasts/$series_id/shadow" 2>&1 || true)"
+      if jq -e '.state == "READY" and .modelId == "mistralai/Timestral-28M" and (.revision | type == "string")' <<<"$shadow" >/dev/null 2>&1; then
+        echo "prévision de comparaison Timestral : $id"
+        finished[$id]=1
+        continue
+      fi
+      line="$(jq -r '"Timestral \(.state) — \(.reason // "")"' <<<"$shadow" 2>/dev/null || echo "$shadow")"
+      line="${line:-en attente de Timestral}"
+    else
       finished[$id]=1
       continue
     fi
     pending=$((pending + 1))
-    progress="$(api "$explorer/api/forecasts/$series_id/progress" 2>&1 || true)"
-    line="$(jq -r '"\(.state) \(.observedPoints // 0)/\(.requiredPoints) — \(.reason // "")"' <<<"$progress" 2>/dev/null || echo "$progress")"
     if [[ "$line" != "${last[$id]:-}" ]]; then echo "  $id : $line"; last[$id]="$line"; fi
   done
   (( pending == 0 )) && exit 0
   if (( $(date +%s) > deadline )); then
     for item in "${approved[@]}"; do
       IFS='|' read -r id _ <<<"$item"
-      [[ -z "${finished[$id]:-}" ]] && echo "ÉCHEC : pas de prévision TimesFM pour $id après ${wait_timeout} s — ${last[$id]:-aucun état}" >&2
+      [[ -z "${finished[$id]:-}" ]] && echo "ÉCHEC : prévisions attendues incomplètes pour $id après ${wait_timeout} s — ${last[$id]:-aucun état}" >&2
     done
     exit 1
   fi
