@@ -14,7 +14,10 @@ on:
       - compose.yaml
       - compose.forecast.yaml
       - .env.example
+      - compose.forecast-test.yaml
       - scripts/seed-forecasts.sh
+      - scripts/test-forecast.ps1
+      - scripts/check-forecast-models.py
       - .github/workflows/forecast.yml
 
 permissions:
@@ -28,46 +31,22 @@ jobs:
   forecast:
     runs-on: ubuntu-latest
     timeout-minutes: 75
+    env:
+      TIMESFM_CPUS: "3.0"
+      TIMESFM_THREADS: "3"
+      TIMESFM_MEM_LIMIT: 6g
     steps:
       - uses: actions/checkout@v4
 
-      - name: Secrets de test et modules
-        run: |
-          scripts/init-env.sh
-          sed -i "s|^COMPOSE_FILE=.*|COMPOSE_FILE=compose.yaml:compose.forecast.yaml|" .env
-          # Profil accéléré : collecte toutes les 2 s, pas de 5 s, pilote chaque minute. 128 points
-          # d'historique tiennent alors en 11 min au lieu de 64 au pas proposé de 30 s.
-          # Le coureur a 4 CPU : TimesFM en garde un pour le reste de la pile.
-          cat >>.env <<'ENV'
-          FORECAST_METRICS_REFRESH_MS=2000
-          FORECAST_PILOT_INTERVAL=1m
-          FORECAST_STEP_MS=5000
-          TIMESFM_CPUS=3.0
-          TIMESFM_THREADS=3
-          TIMESFM_MEM_LIMIT=6g
-          ENV
+      - name: Inférence des deux modèles sur une série synthétique
+        shell: pwsh
+        run: ./scripts/test-forecast.ps1
 
-      - name: Images publiées
-        run: docker compose pull --quiet --ignore-buildable
-
-      - name: Construction de TimesFM
-        run: docker compose build timesfm forecast-model-prefetch
-
-      # Explorer attend TimesFM sain, donc la fin du téléchargement du modèle.
-      - name: Démarrage (téléchargement du modèle compris)
-        run: docker compose up -d
-
-      - name: Métriques, approbation et première prévision des deux modèles
-        env:
-          FORECAST_WAIT_TIMEOUT: "2400"
-        run: scripts/seed-forecasts.sh --wait
-
-      - name: État et journaux en cas d'échec
-        if: failure()
-        run: |
-          docker compose ps --all
-          docker compose logs --no-color --tail 120 explorer timesfm forecast-model-prefetch forecast-postgres
+      - name: Collecte Kafka, approbation et prévision des trois séries
+        shell: pwsh
+        run: ./scripts/test-forecast.ps1 -Mode Complet
 
       - name: Arrêt
         if: always()
-        run: docker compose down -v
+        shell: pwsh
+        run: ./scripts/test-forecast.ps1 -Arreter

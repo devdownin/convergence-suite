@@ -27,3 +27,6 @@ replay_pid*
 .env
 *.bak
 convergence-ca.crt
+
+# Secrets locaux de la pile de test des previsions
+.forecast-test.env
