@@ -1,0 +1,76 @@
+name: Prévisions
+
+# Banc de la tâche 3.1 : vraie pile de prévision (PostgreSQL + TimesFM construit depuis KafkaExplorer),
+# métriques de péage créées et approuvées par scripts/seed-forecasts.sh, réussite seulement quand
+# TimesFM a rendu une prévision sur chaque série.
+#
+# Hors de la CI de chaque PR : le build de TimesFM, le téléchargement du modèle et les 128 points
+# d'historique exigés avant la première prévision prennent une demi-heure.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+  pull_request:
+    paths:
+      - compose.forecast.yaml
+      - scripts/seed-forecasts.sh
+      - .github/workflows/forecast.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forecast-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secrets de test et modules
+        run: |
+          scripts/init-env.sh
+          sed -i "s|^COMPOSE_FILE=.*|COMPOSE_FILE=compose.yaml:compose.forecast.yaml|" .env
+          # Profil accéléré : collecte toutes les 2 s, pas de 5 s, pilote chaque minute. 128 points
+          # d'historique tiennent alors en 11 min au lieu de 64 au pas proposé de 30 s.
+          # Le coureur a 4 CPU : TimesFM en garde un pour le reste de la pile.
+          cat >>.env <<'ENV'
+          FORECAST_METRICS_REFRESH_MS=2000
+          FORECAST_PILOT_INTERVAL=1m
+          FORECAST_STEP_MS=5000
+          TIMESFM_CPUS=3.0
+          TIMESFM_THREADS=3
+          TIMESFM_MEM_LIMIT=6g
+          ENV
+
+      - name: Images publiées
+        run: docker compose pull --quiet --ignore-pull-failures
+
+      # Après le pull, sinon l'image publiée écraserait celle-ci sous le même tag.
+      - name: TEMPORAIRE — Explorer construit depuis le correctif des offsets produits (KafkaExplorer, branche fix/produced-offsets-counter-history)
+        run: docker build -q -t compagnonsdudev/kafkaexplorer:2.4.1 https://github.com/devdownin/kafkaexplorer.git#fix/produced-offsets-counter-history
+
+      - name: Construction de TimesFM
+        run: docker compose build timesfm
+
+      # Explorer attend TimesFM sain, donc la fin du téléchargement du modèle.
+      - name: Démarrage (téléchargement du modèle compris)
+        run: docker compose up -d
+
+      - name: Métriques, approbation, première prévision TimesFM
+        env:
+          FORECAST_WAIT_TIMEOUT: "2400"
+        run: scripts/seed-forecasts.sh --wait
+
+      - name: État et journaux en cas d'échec
+        if: failure()
+        run: |
+          docker compose ps --all
+          docker compose logs --no-color --tail 120 explorer timesfm forecast-model-prefetch forecast-postgres
+
+      - name: Arrêt
+        if: always()
+        run: docker compose down -v

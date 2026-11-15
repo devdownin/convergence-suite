@@ -49,6 +49,7 @@ Le cœur (`compose.yaml`) démarre Kafka, KafkaExplorer, Kex-anHarness, Autorout
 | `monitoring` | `compose.monitoring.yaml` | Prometheus, Alertmanager, Grafana d'Autoroutes, étendus à KafkaExplorer et SpectraLLM | ~1 Go |
 | `auth` | `compose.auth.yaml` | Keycloak, royaume `supervision` d'Autoroutes | ~1 Go |
 | `actions` | `compose.actions.yaml` | Déclaration d'anomalie gouvernée : proposition du modèle, validation humaine, relecture par `etat_gare`. Exige `auth`, Kex ≥ `0.13.2` et Autoroutes ≥ `0.5.4` | négligeable |
+| `forecast` | `compose.forecast.yaml` | Prévisions TimesFM de KafkaExplorer : historique PostgreSQL, inférence CPU construite depuis les sources d'Explorer au tag épinglé, approbation à chaud. Exige KafkaExplorer avec la PR #565 (> `2.4.1`) : sous `2.4.1`, aucune série d'offsets produits ne reçoit de prévision | 4 CPU, ~8 Go de RAM ; build et modèle au premier démarrage |
 | `e2e` | `compose.e2e.yaml` | Jeu d'essai de la boucle complète : gare muette au simulateur, modèle factice scripté, seuil de silence court. Exige `auth` et `actions`. Pour `scripts/e2e.sh`, pas pour un usage réel | négligeable |
 
 ```bash
@@ -67,7 +68,14 @@ Le simulateur fait taire Vienne (`GL-BPV-0134`) après 2 minutes. L'agent lance 
 
 Pourquoi des surcouches et non des profils : un module doit aussi modifier des services du cœur (le module `docs` ajoute une connexion MCP à l'agent), ce qu'un profil Compose ne sait pas faire.
 
-Le module `forecast` (TimesFM) arrivera en phase 3 : son service n'a pas d'image publiée.
+### Prévoir le trafic de péage
+
+```bash
+COMPOSE_FILE=compose.yaml:compose.forecast.yaml
+docker compose up -d && scripts/seed-forecasts.sh --wait
+```
+
+Le script crée deux métriques dans KafkaExplorer — débit de `toll-events` et débit des rejets —, approuve leurs séries, puis attend la première prévision TimesFM. Elle arrive après 128 points d'historique : un peu plus d'une heure au pas proposé de 30 s. La console d'Explorer les montre dans « Metrics Forecast », et l'agent les lit par les outils MCP de prévision. Les entrées/sorties par gare restent hors du script : elles demandent du SQL sur le contenu des messages, que le pilote de prévision n'accepte pas. La CI fait tourner le banc chaque semaine et sur toute PR qui le touche (workflow `Prévisions`, profil accéléré à 11 min d'historique).
 
 ## Sécurité — à lire avant tout partage
 
@@ -88,7 +96,7 @@ Les chiffres d'Autoroutes viennent de son simulateur : ce sont des **données si
 
 ```
 compose.yaml                 cœur de la suite
-compose.{docs,monitoring,auth,actions,e2e}.yaml   modules
+compose.{docs,monitoring,auth,actions,forecast,e2e}.yaml   modules
 proxy/                       Caddyfile et un fichier de sites par module
 observability/prometheus.yml collecte Prometheus de la suite
 upstream/                    fichiers repris des dépôts sources à un tag précis (ne pas éditer)
@@ -96,6 +104,7 @@ scripts/init-env.sh          crée .env et génère les secrets
 scripts/smoke.sh             test de fumée (santé, catalogues MCP, unicité des noms d'outils)
 scripts/e2e.sh               boucle complète : gare muette → décision → approbation → action → vérification
 e2e/fake-llm.py              modèle factice compatible OpenAI, scripté, pour le module e2e
+scripts/seed-forecasts.sh    métriques de péage, approbation des séries, attente de la prévision TimesFM
 scripts/seed-kex.sh          propose puis approuve les trois compétences de kex/skills
 scripts/build-realm.py       génère auth/realm-supervision.json (royaume Autoroutes + client kex-supervisor)
 kex/skills/                  procédures de l'agent : triage DLQ, carte figée, anomalie de gare
@@ -113,7 +122,7 @@ docs/verifications-phase-0.md  points vérifiés dans le code des quatre dépôt
 | 0 — Cadrage | ADR, matrice de versions, six points vérifiés | Livrée |
 | 1 — Assemblage | Compose à modules, broker unique, proxy TLS, test de fumée en CI | Livrée, à valider en CI |
 | 2 — Agent unifié et gouvernance | Jetons renouvelés et `harness_*` (code Kex, PR #222), client `kex-supervisor`, caller SpectraLLM, processus et compétences | Livrée ; MCP d'Autoroutes sous jeton avec le module `auth` (Kex `0.13.0`) |
-| 3 — Boucle opérationnelle | Métriques péage, prévisions, DLQ, action vérifiée | Code fusionné : 3.2 (Autoroutes #59), 3.3 (Autoroutes #58), 3.4 (Kex #223) ; publiés dans Kex `0.13.1` et Autoroutes `0.5.3`, puis complétés par Kex `0.13.2` et Autoroutes `0.5.4` ; boucle complète prouvée en CI par `scripts/e2e.sh`, après trois correctifs qu'elle a révélés (Kex #225, Autoroutes #61) ; 3.1 : `scripts/seed-forecasts.sh` écrit mais non vérifié (débit et rejets seulement ; entrées/sorties par gare à faire avec l'assistant de la console) |
+| 3 — Boucle opérationnelle | Métriques péage, prévisions, DLQ, action vérifiée | Code fusionné : 3.2 (Autoroutes #59), 3.3 (Autoroutes #58), 3.4 (Kex #223) ; publiés dans Kex `0.13.1` et Autoroutes `0.5.3`, puis complétés par Kex `0.13.2` et Autoroutes `0.5.4` ; boucle complète prouvée en CI par `scripts/e2e.sh`, après trois correctifs qu'elle a révélés (Kex #225, Autoroutes #61) ; 3.1 : module `forecast` et `scripts/seed-forecasts.sh --wait`, vérifiés par le workflow `Prévisions` jusqu'à la prévision TimesFM (débit des événements et des rejets ; entrées/sorties par gare hors pilote, faute de gabarit éligible) |
 | 4 — Connaissance et IA locale | Ingestion des specs et audits, DPO, fine-tuning | À venir |
 | 5 — Industrialisation | MCP communs, monitoring complet, SSO, liens profonds | À venir |
 
