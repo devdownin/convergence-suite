@@ -3,8 +3,8 @@
 # Historique des métriques dans PostgreSQL, inférence TimesFM sur CPU, approbation à chaud depuis la
 # console (« Metrics » → « Prepare a forecast ») ou par scripts/seed-forecasts.sh.
 #
-# TimesFM n'a pas d'image publiée : il se construit depuis les sources de KafkaExplorer, au tag qui
-# correspond à l'image d'Explorer, pour que client et service parlent le même contrat. Le premier
+# Compose construit l'image TimesFM depuis le tag de KafkaExplorer qui correspond à l'image
+# d'Explorer, pour que client et service parlent le même contrat. Le premier
 # démarrage télécharge les poids épinglés (vérifiés par SHA-256) dans le volume timesfm_models.
 # Poids Timestral sous licence Modified MIT : https://huggingface.co/mistralai/Timestral-28M/blob/main/LICENSE
 # Ressources : 4 CPU et 8 Gio par défaut (TIMESFM_CPUS, TIMESFM_MEM_LIMIT).
@@ -31,6 +31,7 @@ services:
 
   forecast-model-prefetch:
     image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-2.5.0}
+    pull_policy: build
     build:
       context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-2.5.0}:services/timesfm
     restart: "no"
@@ -49,8 +50,7 @@ services:
 
   timesfm:
     image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-2.5.0}
-    # Même build que forecast-model-prefetch, servi par le cache : sans lui, Compose tenterait de
-    # tirer une image qui n'est publiée nulle part.
+    pull_policy: build
     build:
       context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-2.5.0}:services/timesfm
     restart: unless-stopped

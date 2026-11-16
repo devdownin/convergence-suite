@@ -119,6 +119,8 @@ Le lanceur utilise un projet Compose propre au dossier de travail et stocke ses 
 
 Exécutez `scripts/init-env.sh` depuis Bash pour créer `.env` ou compléter les secrets. Dans `.env`, activez le module avec `COMPOSE_FILE=compose.yaml:compose.forecast.yaml`. Sous Windows, utilisez le séparateur documenté dans [`.env.example`](.env.example). Si votre `.env` épingle déjà des tags, reportez les versions actuelles depuis ce même fichier.
 
+Compose construit localement l’image `kafkaexplorer-timesfm` à partir du tag Git correspondant à `EXPLORER_IMAGE_TAG`. Le téléchargement des autres images et la première construction nécessitent un accès Internet.
+
 Les [poids Timestral‑28M](https://huggingface.co/mistralai/Timestral-28M/blob/main/LICENSE) sont distribués sous licence Modified MIT. Pour utiliser TimesFM seul, renseigner dans `.env` les trois réglages de désactivation de Timestral indiqués dans `.env.example`.
 
 ```bash
