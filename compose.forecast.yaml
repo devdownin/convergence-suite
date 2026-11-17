@@ -30,10 +30,10 @@ services:
       - forecast_private
 
   forecast-model-prefetch:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-latest}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-2.5.0}
     pull_policy: build
     build:
-      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-latest}:services/timesfm
+      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-2.5.0}:services/timesfm
     restart: "no"
     read_only: true
     tmpfs:
@@ -49,10 +49,10 @@ services:
     command: ["exec /app/.venv/bin/python -m kex_timesfm.prefetch"]
 
   timesfm:
-    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-latest}
+    image: ${IMAGE_NAMESPACE:-compagnonsdudev}/kafkaexplorer-timesfm:${EXPLORER_IMAGE_TAG:-2.5.0}
     pull_policy: build
     build:
-      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-latest}:services/timesfm
+      context: https://github.com/devdownin/kafkaexplorer.git#v${EXPLORER_IMAGE_TAG:-2.5.0}:services/timesfm
     restart: unless-stopped
     read_only: true
     tmpfs:
