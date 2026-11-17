@@ -180,13 +180,16 @@ services:
       AUTOROUTES_MCP_TOKEN: ${AUTOROUTES_MCP_TOKEN:-}
       SPRING_AI_MCP_CLIENT_STREAMABLEHTTP_CONNECTIONS_MCPAUTOROUTE_URL: http://autoroutes-mcp:8090
       SPRING_AI_MCP_CLIENT_STREAMABLEHTTP_CONNECTIONS_MCPAUTOROUTE_ENDPOINT: /mcp
-      # Les deux outils d'écriture d'Autoroutes sont refusés à l'agent en phase 1 : ils ne
-      # s'ouvriront qu'avec l'approbation humaine de la phase 2 (ADR 0004). Les règles
-      # s'ajoutent à celles d'application.yml (spectra_ask, spectra_status).
-      SPRING_APPLICATION_JSON: >-
-        {"kex":{"agent":{"tools":{"rules":{
-        "declarer_anomalies":{"denied":true},
-        "lever_anomalies":{"denied":true}}}}}}
+      # Règles d'outils, départ autonome du cycle, budget : un fichier par module sous
+      # /etc/kex/config/, lus dans l'ordre et fusionnés clé par clé (kex/config/README.md). Plus de
+      # SPRING_APPLICATION_JSON, qu'une surcouche remplaçait en entier.
+      SPRING_CONFIG_ADDITIONAL_LOCATION: optional:file:/etc/kex/config/*/
+      # Persiste chiffrés les serveurs MCP ajoutés depuis la console ; sans clé, ils disparaissent
+      # au redémarrage et la console le signale en bandeau.
+      KEX_MCP_STORAGE_KEY: ${KEX_MCP_STORAGE_KEY:-}
+      # Lus par kex/config/core/application.yml.
+      KEX_AGENT_SUPERVISION_SCHEDULE_ENABLED: ${KEX_AGENT_SUPERVISION_SCHEDULE_ENABLED:-true}
+      KEX_AGENT_TOKEN_DAILY_LIMIT: ${KEX_AGENT_TOKEN_DAILY_LIMIT:-300000}
       # Processus supervisé de la suite. Le hint donne à l'agent les topics et le groupe à interroger :
       # il ne les déduit pas du nom. Procédures associées : kex/skills, amorcées par scripts/seed-kex.sh.
       KEX_AGENT_SUPERVISION_PROCESSES_0_ID: pipeline-peage
@@ -199,9 +202,11 @@ services:
     volumes:
       # Connexions MCP chiffrées, mémoire et espace utilisateur.
       - agent_state:/var/lib/kex
+      - ./kex/config/core:/etc/kex/config/10-core:ro
     healthcheck:
-      # L'image JRE n'a ni curl ni wget.
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8081'"]
+      # L'image JRE n'a ni curl ni wget : requête HTTP à la main. La sonde de disponibilité, pas
+      # seulement le port : un port ouvert ne dit pas que le contexte Spring a fini de démarrer.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -210,6 +215,11 @@ services:
     stop_grace_period: 35s
     restart: unless-stopped
     logging: *logging
+    deploy:
+      resources:
+        # Le seul service Java de la suite sans plafond : -XX:MaxRAMPercentage=75 de l'image se
+        # calculait alors sur la mémoire de l'hôte entier.
+        limits: { memory: 1g }
 
   # ═══ Autoroutes ══════════════════════════════════════════════════════════════
   # Services repris de compose.yaml / compose.hub.yaml d'Autoroutes (v0.5.2), sur le broker de

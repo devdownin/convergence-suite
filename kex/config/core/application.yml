@@ -1,0 +1,26 @@
+# Cœur de la suite. Voir kex/config/README.md pour l'ordre de lecture des modules.
+kex:
+  agent:
+    tools:
+      rules:
+        # Les deux outils d'écriture d'Autoroutes sont refusés au modèle (ADR 0004). Le module
+        # actions rouvre declarer_anomalies aux seules actions approuvées (governed-only).
+        declarer_anomalies:
+          denied: true
+        lever_anomalies:
+          denied: true
+    supervision:
+      schedule:
+        # Une seule instance de l'agent dans la suite : le cycle part seul, sans la base qu'exige
+        # le verrou multi-instance (Kex postérieur à 0.13.2 ; ignoré, avec un avertissement, avant).
+        enabled: ${KEX_AGENT_SUPERVISION_SCHEDULE_ENABLED:true}
+        single-instance: true
+        interval: 1m
+        adaptive:
+          # Cinq minutes après un cycle qui a vu une anomalie ou échoué, trente au repos.
+          enabled: true
+          degraded: 5m
+          healthy: 30m
+    token-budget:
+      # Un cycle qui part seul n'a que ce plafond pour frein. 0 désactive.
+      daily-limit: ${KEX_AGENT_TOKEN_DAILY_LIMIT:300000}

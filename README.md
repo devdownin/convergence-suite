@@ -82,6 +82,12 @@ docker compose up -d && scripts/e2e.sh
 
 Le simulateur fait taire Vienne (`GL-BPV-0134`) après 2 minutes. L'agent lance des cycles. Le modèle factice (`e2e/fake-llm.py`) appelle réellement `etat_gare` et ne propose `DECLARE_ANOMALY` que si la gare y est `STALE`. Le script approuve la décision comme un opérateur, puis exige `VERIFIED` : Autoroutes a appliqué la déclaration et `etat_gare` en relit la version. Seul le jugement du modèle est simulé ; jeton Keycloak, politique, approbation, action et vérification sont les vrais. Compter environ 2 minutes après le démarrage, sans clé de fournisseur. La CI le lance à chaque PR (job `e2e`).
 
+### Configuration de l'agent
+
+Chaque module dépose sa configuration de Kex-anHarness dans `kex/config/<module>/application.yml`, monté sous `/etc/kex/config/` : les fichiers sont lus dans l'ordre et fusionnés clé par clé. Le module `actions` n'a donc plus à recopier les règles de refus du cœur ([détail](kex/config/README.md)).
+
+Le cœur lance seul le cycle de supervision : cinq minutes après un cycle qui a vu une anomalie ou échoué, trente au repos, avec un plafond de 300 000 jetons par jour (`KEX_AGENT_TOKEN_DAILY_LIMIT`). `KEX_AGENT_SUPERVISION_SCHEDULE_ENABLED=false` revient aux cycles lancés à la main. Le départ autonome exige une version de Kex postérieure à `0.13.2` ; avant, l'agent le signale au démarrage et ne lance rien.
+
 Pourquoi des surcouches et non des profils : un module doit aussi modifier des services du cœur (le module `docs` ajoute une connexion MCP à l'agent), ce qu'un profil Compose ne sait pas faire.
 
 ### Prévoir le trafic de péage avec Timestral
@@ -143,7 +149,7 @@ Les chiffres d'Autoroutes viennent de son simulateur : ce sont des **données si
 
 - Avec le module `docs`, l'interface web de SpectraLLM répond 401 sur ses appels d'API : elle n'envoie pas la clé que son serveur MCP exige. Utiliser l'API ou l'agent.
 - La règle d'alerte mémoire d'Autoroutes additionne le tas de toutes les JVM collectées (voir `observability/prometheus.yml`).
-- Kex-anHarness n'est pas collecté par Prometheus : son endpoint de métriques exige le bearer de l'API.
+- Kex-anHarness n'est pas collecté par Prometheus : son endpoint de métriques exige le bearer de l'API. La version de Kex qui suivra `0.13.2` apporte un rôle `METRICS` limité à cette lecture ; la collecte se branchera avec elle, l'image actuelle refusant de démarrer sur un rôle qu'elle ne connaît pas.
 - Le module `auth` exige Kex `0.13.0` ou plus (`0.13.2` pour l'overlay `actions`) : une image plus ancienne ne renouvelle pas son jeton et reçoit 401 (`AUTOROUTES_MCP_SECURITY_ENABLED=false` pour y revenir).
 
 ## Contenu du dépôt
@@ -164,6 +170,7 @@ scripts/seed-forecasts.sh    métriques de péage, approbation des séries, atte
 scripts/seed-kex.sh          propose puis approuve les trois compétences de kex/skills
 scripts/build-realm.py       génère auth/realm-supervision.json (royaume Autoroutes + client kex-supervisor)
 kex/skills/                  procédures de l'agent : triage DLQ, carte figée, anomalie de gare
+kex/config/                  configuration de l'agent par module, fusionnée clé par clé
 auth/                        royaume Keycloak généré
 scripts/sync-upstream.sh     met à jour upstream/
 docs/adr/                    décisions d'architecture

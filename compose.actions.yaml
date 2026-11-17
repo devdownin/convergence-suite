@@ -14,27 +14,9 @@
 # action liée, reste denied. etat_gare est déclaré read-only : Kex n'accepte pour vérificateur qu'un outil que
 # l'administrateur a dit en lecture seule, l'annotation readOnlyHint du serveur ne suffit pas.
 #
-# Le JSON REMPLACE celui de compose.yaml (une seule variable SPRING_APPLICATION_JSON par conteneur) : les règles de
-# refus des outils d'écriture appelés directement par le modèle y sont donc répétées.
+# La configuration est dans kex/config/actions/application.yml, lue après celle du cœur et fusionnée clé par clé
+# (kex/config/README.md) : plus besoin d'y répéter les règles de refus du cœur.
 services:
   agent:
-    environment:
-      SPRING_APPLICATION_JSON: >-
-        {"kex":{"agent":{
-        "tools":{"rules":{
-        "declarer_anomalies":{"governed-only":true},
-        "etat_gare":{"read-only":true},
-        "lever_anomalies":{"denied":true}}},
-        "supervision":{
-        "autonomy":{"DECLARE_ANOMALY":"SUPERVISED","CLEAR_ANOMALY":"SUPERVISED"},
-        "actions":{"DECLARE_ANOMALY":{
-        "connection":"mcpautoroute","tool":"declarer_anomalies",
-        "allowed-arguments":["gare","anomalies"],
-        "verification":{
-        "connection":"mcpautoroute","tool":"etat_gare",
-        "arguments-from-action":{"gare":"/stationId"},
-        "result-pointer":"/maVersion",
-        "expected-from-action-pointer":"/eventTime",
-        "observed-at-pointer":"/lectureA",
-        "max-age":"5m",
-        "settle":"15s"}}}}}}}
+    volumes:
+      - ./kex/config/actions:/etc/kex/config/30-actions:ro

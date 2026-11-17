@@ -1,0 +1,7 @@
+# Banc de bout en bout : scripts/e2e.sh lance lui-même les cycles et attend une décision précise.
+# Un cycle autonome concurrent ferait échouer son appel (« cycle déjà en cours »).
+kex:
+  agent:
+    supervision:
+      schedule:
+        enabled: false

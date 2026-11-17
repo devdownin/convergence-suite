@@ -46,6 +46,7 @@ Trois serveurs ou clients MCP sur quatre sont déjà sur Spring AI 2.0.2 : l'ali
 | Fonctions Kex de la phase 2 | — | `client-credentials` et `harness_*` présents dès Kex `0.13.0` | MCP d'Autoroutes sous jeton dès que le module `auth` est actif |
 | Fonctions de la phase 3 | Kex : `DECLARE_ANOMALY` (PR #223) ; Autoroutes : `etat_gare` (PR #58), provenance des rejets (PR #59) | Présentes dans Kex `0.13.1` et Autoroutes `0.5.3`, mais la boucle n'aboutit qu'avec Kex #225 (`governed-only`, `settle`) et Autoroutes #61 (gare muette, `structuredContent`) | Overlay `compose.actions.yaml` à utiliser avec Kex ≥ `0.13.2` et Autoroutes ≥ `0.5.4` : sous `0.13.1`, `governed-only` est ignoré et `declarer_anomalies` redevient visible du modèle |
 | Prévisions (3.1) | KafkaExplorer : correctif des offsets (#565) et du taux de rejet (#567) | Inclus dans `2.5.0`, qui intègre également Timestral‑28M | TimesFM fournit les prévisions principales et Timestral évalue le même historique en parallèle |
+| Fonctions Kex de l'audit d'intégration | Kex `main` : départ autonome sur instance unique (`schedule.single-instance`), rôle `METRICS` | Absentes de `0.13.2` | Le cœur déclare déjà le départ autonome : ignoré avec un avertissement tant que l'image n'est pas montée. La collecte Prometheus de l'agent attend le rôle `METRICS` |
 | Tags Kex-anHarness | — | Un tag `v9.12.1` coexiste avec `v0.12.1` | Probable coquille à supprimer dans le dépôt Kex |
 
 ## Mettre à jour une version
