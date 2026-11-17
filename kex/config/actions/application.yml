@@ -1,0 +1,34 @@
+# Module actions : déclaration d'anomalie gouvernée (tâche 3.4). Kex >= 0.13.2, Autoroutes >= 0.5.4.
+# Se superpose à core/ : seules les clés citées ici changent.
+kex:
+  agent:
+    tools:
+      rules:
+        # Caché au modèle, laissé à l'action approuvée. denied: false explicite, sans quoi le refus
+        # du cœur, plus fort, resterait en place.
+        declarer_anomalies:
+          denied: false
+          governed-only: true
+        # Kex n'accepte pour vérificateur qu'un outil que l'administrateur a dit en lecture seule.
+        etat_gare:
+          read-only: true
+    supervision:
+      autonomy:
+        DECLARE_ANOMALY: SUPERVISED
+        CLEAR_ANOMALY: SUPERVISED
+      actions:
+        DECLARE_ANOMALY:
+          connection: mcpautoroute
+          tool: declarer_anomalies
+          allowed-arguments: [gare, anomalies]
+          verification:
+            connection: mcpautoroute
+            tool: etat_gare
+            arguments-from-action:
+              gare: /stationId
+            result-pointer: /maVersion
+            expected-from-action-pointer: /eventTime
+            observed-at-pointer: /lectureA
+            max-age: 5m
+            # Autoroutes applique la déclaration en différé : relire jusqu'à 15 s avant de conclure.
+            settle: 15s

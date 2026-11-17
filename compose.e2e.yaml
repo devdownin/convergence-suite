@@ -34,6 +34,9 @@ services:
       OPENROUTER_API_KEY: e2e-sans-valeur
       OPENROUTER_BASE_URL: http://fake-llm:8000/v1
       OPENROUTER_MODEL: fake-scripted
+    volumes:
+      # Pas de cycle autonome concurrent de ceux que lance scripts/e2e.sh.
+      - ./kex/config/e2e:/etc/kex/config/90-e2e:ro
 
   autoroutes-simulator:
     environment:
