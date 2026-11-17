@@ -199,6 +199,14 @@ services:
         topics [toll-events], consumer group autoroutes-supervision ; DLQ : topic source toll-events,
         topic de rejets toll-events.rejected ; état publié côté carte par consulter_anomalies (Autoroutes).
         Les données issues du simulateur sont étiquetées simulées.
+      # Liens du détail du processus dans la console (Kex postérieur à 0.13.2 ; ignorés avant). Routes
+      # vérifiées dans KafkaExplorer 2.5.0 ; la carte d'Autoroutes s'ouvre à sa racine.
+      KEX_AGENT_SUPERVISION_PROCESSES_0_LINKS_0_LABEL: Topic toll-events dans KafkaExplorer
+      KEX_AGENT_SUPERVISION_PROCESSES_0_LINKS_0_URL: ${EXPLORER_PUBLIC_URL:-http://localhost:8080}/topic/toll-events
+      KEX_AGENT_SUPERVISION_PROCESSES_0_LINKS_1_LABEL: Rejets dans KafkaExplorer
+      KEX_AGENT_SUPERVISION_PROCESSES_0_LINKS_1_URL: ${EXPLORER_PUBLIC_URL:-http://localhost:8080}/dead-letter
+      KEX_AGENT_SUPERVISION_PROCESSES_0_LINKS_2_LABEL: Carte des péages
+      KEX_AGENT_SUPERVISION_PROCESSES_0_LINKS_2_URL: ${AUTOROUTES_PUBLIC_URL:-http://localhost:8084}
     volumes:
       # Connexions MCP chiffrées, mémoire et espace utilisateur.
       - agent_state:/var/lib/kex
